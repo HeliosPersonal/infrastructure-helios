@@ -1,0 +1,265 @@
+# ====================================================================================
+# TERRAFORM VARIABLES
+# ====================================================================================
+# Variable definitions for configurable infrastructure parameters
+# Actual values are set in terraform.tfvars and terraform.secret.tfvars
+# ====================================================================================
+
+# ====================================================================================
+# GENERAL CONFIGURATION
+# ====================================================================================
+
+variable "kubeconfig_path" {
+  type        = string
+  default     = "~/.kube/config"
+  description = "Path to kubeconfig for k3s cluster."
+}
+
+variable "enable_typesense_clusters" {
+  type        = bool
+  default     = false
+  description = "Create TypesenseCluster resources (set to true only after the CRD is installed)."
+}
+
+# ====================================================================================
+# DOMAIN CONFIGURATION
+# ====================================================================================
+
+variable "base_domain" {
+  type        = string
+  description = "Base domain for all services (e.g., devoverflow.org)"
+}
+
+variable "internal_domain" {
+  type        = string
+  default     = "helios"
+  description = "Internal domain suffix for local network access (e.g., helios)"
+}
+
+variable "keycloak_subdomain" {
+  type        = string
+  default     = "keycloak"
+  description = "Subdomain for Keycloak (e.g., keycloak -> keycloak.devoverflow.org)"
+}
+
+variable "ddns_subdomains" {
+  type        = list(string)
+  default     = ["www", "staging", "keycloak"]
+  description = "List of subdomains to configure DDNS for"
+}
+
+# ====================================================================================
+# CLOUDFLARE CONFIGURATION
+# ====================================================================================
+
+variable "cloudflare_api_token" {
+  type        = string
+  sensitive   = true
+  description = "Cloudflare API token for DDNS updates"
+}
+
+# ====================================================================================
+# LET'S ENCRYPT CONFIGURATION
+# ====================================================================================
+
+variable "letsencrypt_email" {
+  type        = string
+  description = "Email address for Let's Encrypt certificate notifications and account recovery"
+}
+
+# ====================================================================================
+# POSTGRESQL CONFIGURATION
+# ====================================================================================
+
+variable "pg_staging_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "pg_production_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "pg_staging_database" {
+  type        = string
+  default     = "stagingdb"
+  description = "Database name for staging PostgreSQL"
+}
+
+variable "pg_production_database" {
+  type        = string
+  default     = "productiondb"
+  description = "Database name for production PostgreSQL"
+}
+
+variable "pg_storage_size" {
+  type        = string
+  default     = "10Gi"
+  description = "Persistent volume size for PostgreSQL"
+}
+
+variable "pg_storage_class" {
+  type        = string
+  default     = "local-path"
+  description = "Storage class for PostgreSQL persistent volumes"
+}
+
+# ====================================================================================
+# RABBITMQ CONFIGURATION
+# ====================================================================================
+
+variable "rabbit_staging_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "rabbit_production_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "rabbit_persistence_size" {
+  type        = string
+  default     = "5Gi"
+  description = "Persistent volume size for RabbitMQ"
+}
+
+# ====================================================================================
+# TYPESENSE CONFIGURATION
+# ====================================================================================
+
+variable "typesense_staging_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "typesense_production_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "typesense_storage_size" {
+  type        = string
+  default     = "5Gi"
+  description = "Persistent volume size for Typesense"
+}
+
+# ====================================================================================
+# KEYCLOAK CONFIGURATION
+# ====================================================================================
+
+variable "keycloak_admin_user" {
+  type    = string
+  default = "admin"
+}
+
+variable "keycloak_admin_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "keycloak_postgres_password" {
+  type      = string
+  sensitive = true
+  default   = "postgres"
+}
+
+# ====================================================================================
+# GRAFANA CLOUD CONFIGURATION
+# ====================================================================================
+
+variable "grafana_cloud_prometheus_url" {
+  type        = string
+  description = "Grafana Cloud Prometheus remote write URL (e.g., https://prometheus-prod-XX-XX.grafana.net)"
+}
+
+variable "grafana_cloud_prometheus_user" {
+  type        = string
+  description = "Grafana Cloud Prometheus username (Instance ID)"
+}
+
+variable "grafana_cloud_api_token" {
+  type        = string
+  sensitive   = true
+  description = "Grafana Cloud API token (used for all services: Prometheus, Loki, Tempo)"
+}
+
+variable "grafana_cloud_loki_url" {
+  type        = string
+  description = "Grafana Cloud Loki URL (e.g., https://logs-prod-XX-XX.grafana.net)"
+}
+
+variable "grafana_cloud_loki_user" {
+  type        = string
+  description = "Grafana Cloud Loki username (Instance ID)"
+}
+
+variable "grafana_cloud_tempo_url" {
+  type        = string
+  description = "Grafana Cloud Tempo OTLP endpoint (e.g., https://tempo-prod-XX-XX.grafana.net:443)"
+}
+
+variable "grafana_cloud_tempo_user" {
+  type        = string
+  description = "Grafana Cloud Tempo username (Instance ID)"
+}
+
+# ====================================================================================
+# OLLAMA LLM SERVICE CONFIGURATION
+# ====================================================================================
+
+variable "ollama_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable Ollama LLM service deployment"
+}
+
+variable "ollama_helm_chart_version" {
+  type        = string
+  description = "Ollama Helm chart version"
+  default     = "0.30.0"
+}
+
+variable "ollama_image_tag" {
+  type        = string
+  description = "Ollama Docker image tag"
+  default     = "latest"
+}
+
+variable "ollama_default_model" {
+  type        = string
+  description = "Default LLM model to download on initialization"
+  default     = "phi3.5:mini"
+}
+
+variable "ollama_storage_size" {
+  type        = string
+  description = "Persistent volume size for model storage"
+  default     = "20Gi"
+}
+
+variable "ollama_memory_request" {
+  type        = string
+  description = "Memory request for Ollama pod"
+  default     = "2Gi"
+}
+
+variable "ollama_memory_limit" {
+  type        = string
+  description = "Memory limit for Ollama pod"
+  default     = "8Gi"
+}
+
+variable "ollama_cpu_request" {
+  type        = string
+  description = "CPU request for Ollama pod"
+  default     = "500m"
+}
+
+variable "ollama_cpu_limit" {
+  type        = string
+  description = "CPU limit for Ollama pod"
+  default     = "4000m"
+}
+

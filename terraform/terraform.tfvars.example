@@ -1,0 +1,80 @@
+# ====================================================================================
+# TERRAFORM VARIABLES EXAMPLE
+# ====================================================================================
+# Copy this file to terraform.tfvars and terraform.secret.tfvars
+# Fill in your actual values
+# ====================================================================================
+
+# ====================================================================================
+# terraform.tfvars (can be committed to git)
+# ====================================================================================
+
+# Domain Configuration
+base_domain        = "example.com"
+internal_domain    = "helios"
+keycloak_subdomain = "keycloak"
+ddns_subdomains    = ["www", "staging", "keycloak"]
+
+# Let's Encrypt
+letsencrypt_email = "admin@example.com"
+
+# PostgreSQL
+pg_staging_database    = "stagingdb"
+pg_production_database = "productiondb"
+pg_storage_size        = "10Gi"
+pg_storage_class       = "local-path"
+
+# RabbitMQ
+rabbit_persistence_size = "5Gi"
+
+# Typesense
+typesense_storage_size = "5Gi"
+
+# Keycloak
+keycloak_admin_user = "admin"
+
+# Grafana Cloud
+grafana_cloud_prometheus_url  = "https://prometheus-prod-XX-XX.grafana.net"
+grafana_cloud_prometheus_user = "123456"
+grafana_cloud_loki_url        = "https://logs-prod-XX.grafana.net"
+grafana_cloud_loki_user       = "123456"
+grafana_cloud_tempo_url       = "https://tempo-prod-XX.grafana.net:443"
+grafana_cloud_tempo_user      = "123456"
+
+# Ollama
+ollama_enabled            = true
+ollama_helm_chart_version = "0.30.0"
+ollama_image_tag          = "latest"
+ollama_default_model      = "phi3.5:mini"
+ollama_storage_size       = "20Gi"
+ollama_memory_request     = "2Gi"
+ollama_memory_limit       = "8Gi"
+ollama_cpu_request        = "500m"
+ollama_cpu_limit          = "4000m"
+
+# ====================================================================================
+# terraform.secret.tfvars (DO NOT commit to git!)
+# ====================================================================================
+
+# Cloudflare
+# cloudflare_api_token = "your-cloudflare-api-token"
+
+# PostgreSQL Passwords
+# pg_staging_password    = "your-staging-db-password"
+# pg_production_password = "your-production-db-password"
+
+# RabbitMQ Passwords
+# rabbit_staging_password    = "your-staging-rabbitmq-password"
+# rabbit_production_password = "your-production-rabbitmq-password"
+
+# Typesense API Keys
+# typesense_staging_api_key    = "your-staging-typesense-key"
+# typesense_production_api_key = "your-production-typesense-key"
+
+# Keycloak
+# keycloak_admin_password    = "your-keycloak-admin-password"
+# keycloak_postgres_password = "your-keycloak-db-password"
+
+# Grafana Cloud
+# grafana_cloud_api_token = "your-grafana-cloud-token"
+
