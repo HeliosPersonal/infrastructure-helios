@@ -14,7 +14,7 @@ locals {
 resource "helm_release" "keycloak" {
   name             = "keycloak"
   namespace        = kubernetes_namespace.infra_production.metadata[0].name
-  repository       = "oci://registry-1.docker.io/bitnamicharts"
+  repository       = "oci://registry-1.docker.io/cloudpirates"
   chart            = "keycloak"
   create_namespace = false
 
@@ -22,74 +22,64 @@ resource "helm_release" "keycloak" {
 
   # Admin user configuration
   set {
-    name  = "auth.adminUser"
+    name  = "keycloak.adminUser"
     value = var.keycloak_admin_user
   }
 
   set_sensitive {
-    name  = "auth.adminPassword"
+    name  = "keycloak.adminPassword"
     value = var.keycloak_admin_password
   }
 
   # Embedded PostgreSQL database for Keycloak data persistence
   set {
-    name  = "postgresql.enabled"
+    name  = "postgres.enabled"
     value = "true"
   }
 
   set {
-    name  = "postgresql.auth.database"
+    name  = "postgres.auth.database"
     value = "keycloak"
   }
 
   set {
-    name  = "postgresql.auth.username"
+    name  = "postgres.auth.username"
     value = "postgres"
   }
 
   set_sensitive {
-    name  = "postgresql.auth.password"
+    name  = "postgres.auth.password"
     value = var.keycloak_postgres_password
   }
 
   # Enable Prometheus metrics endpoint for monitoring
   set {
-    name  = "metrics.enabled"
+    name  = "keycloak.metrics.enabled"
     value = "true"
   }
 
   # Production mode configuration
   set {
-    name  = "production"
+    name  = "keycloak.production"
     value = "true"
   }
 
-  # Public hostname configuration (sets both frontend and admin URLs)
+  # Public hostname configuration
   set {
-    name  = "extraEnvVars[0].name"
-    value = "KC_HOSTNAME"
-  }
-
-  set {
-    name  = "extraEnvVars[0].value"
+    name  = "keycloak.hostname"
     value = local.keycloak_hostname
   }
 
   # Disable strict hostname checking for flexible resolution
   set {
-    name  = "extraEnvVars[1].name"
-    value = "KC_HOSTNAME_STRICT"
-  }
-
-  set {
-    name  = "extraEnvVars[1].value"
+    name  = "keycloak.hostnameStrict"
     value = "false"
   }
 
   # Trust X-Forwarded-* headers from nginx ingress controller
   set {
-    name  = "proxy"
-    value = "edge"
+    name  = "keycloak.proxyHeaders"
+    value = "xforwarded"
   }
 }
 

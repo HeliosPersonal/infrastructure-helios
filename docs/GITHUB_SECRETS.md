@@ -1,150 +1,143 @@
 # GitHub Secrets Configuration
 
-This document lists all secrets that need to be configured in your GitHub repository for CI/CD deployment.
+All secrets are managed in **Infisical** and synced automatically to GitHub Actions secrets.
 
-## Required GitHub Secrets
+Navigate to: **Repository → Settings → Secrets and variables → Actions** to verify.
 
-Navigate to: **Repository → Settings → Secrets and variables → Actions → New repository secret**
+---
 
-### Kubernetes Configuration
+## Secrets Reference
 
-| Secret Name | Description | Example |
-|-------------|-------------|---------|
-| `KUBECONFIG` | Base64-encoded kubeconfig file content | `cat ~/.kube/config \| base64 -w 0` |
+### Azure Terraform State Backend
+
+Required for `terraform init` to authenticate against Azure Blob Storage (`stheliosinfrastate`).
+
+| Secret | Description |
+|---|---|
+| `ARM_CLIENT_ID` | Service Principal `sp-helios-terraform-ci` client ID |
+| `ARM_CLIENT_SECRET` | Service Principal client secret (expires 2027-02-23) |
+| `ARM_TENANT_ID` | Azure AD tenant ID |
+| `ARM_SUBSCRIPTION_ID` | Azure subscription ID (Overflow) |
+
+### Kubernetes
+
+| Secret | Description |
+|---|---|
+| `KUBECONFIG` | Base64-encoded kubeconfig for Helios k3s cluster (`10.12.15.60`) |
+
+Encode with: `base64 -w 0 ~/.kube/config`
+
+### Cloudflare Origin Certificates
+
+The `terraform/certs/` directory is gitignored. Certificates are stored as base64-encoded secrets.
+
+| Secret | Description |
+|---|---|
+| `CLOUDFLARE_ORIGIN_CRT` | Base64-encoded `origin.crt` |
+| `CLOUDFLARE_ORIGIN_KEY` | Base64-encoded `origin.key` |
+
+Encode with: `base64 -w 0 terraform/certs/origin.crt`
 
 ### Cloudflare
 
-| Secret Name | Description |
-|-------------|-------------|
+| Secret | Description |
+|---|---|
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token for DDNS updates |
 
-### Let's Encrypt
+### Domain Configuration
 
-| Secret Name | Description |
-|-------------|-------------|
-| `LETSENCRYPT_EMAIL` | Email for certificate notifications |
+| Secret | Value |
+|---|---|
+| `BASE_DOMAIN` | `devoverflow.org` |
+| `INTERNAL_DOMAIN` | `helios` |
+| `KEYCLOAK_SUBDOMAIN` | `keycloak` |
 
 ### PostgreSQL
 
-| Secret Name | Description |
-|-------------|-------------|
-| `PG_STAGING_PASSWORD` | Staging database password |
-| `PG_PRODUCTION_PASSWORD` | Production database password |
+| Secret | Description |
+|---|---|
+| `PG_PASSWORD` | PostgreSQL admin password (shared instance) |
 
 ### RabbitMQ
 
-| Secret Name | Description |
-|-------------|-------------|
-| `RABBIT_STAGING_PASSWORD` | Staging RabbitMQ password |
-| `RABBIT_PRODUCTION_PASSWORD` | Production RabbitMQ password |
+| Secret | Description |
+|---|---|
+| `RABBIT_PASSWORD` | RabbitMQ admin password (shared instance) |
 
 ### Typesense
 
-| Secret Name | Description |
-|-------------|-------------|
-| `TYPESENSE_STAGING_API_KEY` | Staging Typesense API key |
-| `TYPESENSE_PRODUCTION_API_KEY` | Production Typesense API key |
+| Secret | Description |
+|---|---|
+| `TYPESENSE_API_KEY` | Typesense API key (shared instance) |
 
 ### Keycloak
 
-| Secret Name | Description |
-|-------------|-------------|
+| Secret | Description |
+|---|---|
 | `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin user password |
-| `KEYCLOAK_POSTGRES_PASSWORD` | Keycloak's embedded PostgreSQL password |
+| `KEYCLOAK_POSTGRES_PASSWORD` | Keycloak's internal PostgreSQL password |
 
 ### Grafana Cloud
 
-| Secret Name | Description |
-|-------------|-------------|
-| `GRAFANA_CLOUD_API_TOKEN` | Grafana Cloud API token |
+| Secret | Description |
+|---|---|
+| `GRAFANA_CLOUD_API_TOKEN` | Grafana Cloud API token (used for all services) |
 | `GRAFANA_CLOUD_PROMETHEUS_URL` | Prometheus remote write URL |
-| `GRAFANA_CLOUD_PROMETHEUS_USER` | Prometheus username (Instance ID) |
-| `GRAFANA_CLOUD_LOKI_URL` | Loki URL |
-| `GRAFANA_CLOUD_LOKI_USER` | Loki username |
+| `GRAFANA_CLOUD_PROMETHEUS_USER` | Prometheus instance ID |
+| `GRAFANA_CLOUD_LOKI_URL` | Loki push URL |
+| `GRAFANA_CLOUD_LOKI_USER` | Loki instance ID |
 | `GRAFANA_CLOUD_TEMPO_URL` | Tempo OTLP endpoint |
-| `GRAFANA_CLOUD_TEMPO_USER` | Tempo username |
+| `GRAFANA_CLOUD_TEMPO_USER` | Tempo instance ID |
 
 ---
 
-## Quick Setup Script
+## Azure Infrastructure Setup (one-time, already done)
 
-Run this locally to generate the secrets values (copy output to GitHub):
+Documented for reference. Resources already exist in the **Overflow** subscription.
 
 ```bash
-#!/bin/bash
+az group create --name rg-helios-tfstate --location westeurope
 
-echo "=== KUBECONFIG (base64) ==="
-cat ~/.kube/config | base64 -w 0
-echo -e "\n"
+az storage account create \
+  --name stheliosinfrastate \
+  --resource-group rg-helios-tfstate \
+  --location westeurope \
+  --sku Standard_LRS \
+  --allow-blob-public-access false \
+  --min-tls-version TLS1_2
 
-echo "=== Generate secure passwords ==="
-echo "PG_STAGING_PASSWORD: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
-echo "PG_PRODUCTION_PASSWORD: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
-echo "RABBIT_STAGING_PASSWORD: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
-echo "RABBIT_PRODUCTION_PASSWORD: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
-echo "TYPESENSE_STAGING_API_KEY: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
-echo "TYPESENSE_PRODUCTION_API_KEY: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
-echo "KEYCLOAK_ADMIN_PASSWORD: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
-echo "KEYCLOAK_POSTGRES_PASSWORD: $(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)"
+az storage container create \
+  --name tfstate \
+  --account-name stheliosinfrastate \
+  --auth-mode login
+
+az storage account blob-service-properties update \
+  --account-name stheliosinfrastate \
+  --enable-versioning true
+
+# Create Service Principal scoped to storage account only
+STORAGE_ID=$(az storage account show \
+  --name stheliosinfrastate \
+  --resource-group rg-helios-tfstate \
+  --query id -o tsv)
+
+# Note: requires Storage Blob Data Owner (not Contributor) for AAD auth locking
+az ad sp create-for-rbac \
+  --name sp-helios-terraform-ci \
+  --role "Storage Blob Data Owner" \
+  --scopes "$STORAGE_ID"
 ```
 
----
-
-## GitHub Variables (Non-Sensitive)
-
-Navigate to: **Repository → Settings → Secrets and variables → Actions → Variables → New repository variable**
-
-| Variable Name | Description | Example |
-|---------------|-------------|---------|
-| `BASE_DOMAIN` | Base domain for services | `devoverflow.org` |
-| `INTERNAL_DOMAIN` | Internal network domain | `helios` |
-| `KEYCLOAK_SUBDOMAIN` | Keycloak subdomain | `keycloak` |
+See [AZURE_TFSTATE_BACKEND.md](AZURE_TFSTATE_BACKEND.md) for full details.
 
 ---
 
-## Self-Hosted Runner Configuration
+## Self-Hosted Runner Requirements
 
-The workflow uses `runs-on: self-hosted` to run on your Helios machine.
+The workflow runs on the `helios` self-hosted runner. Ensure it has:
 
-### Runner Requirements
+- **Terraform** >= 1.5
+- **kubectl** connected to the k3s cluster
+- **Helm** >= 3.0
 
-Ensure your self-hosted runner has:
-
-1. **Terraform** installed:
-   ```bash
-   # Install Terraform
-   wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-   echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-   sudo apt update && sudo apt install terraform
-   ```
-
-2. **kubectl** installed and configured:
-   ```bash
-   curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-   sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-   ```
-
-3. **Helm** installed:
-   ```bash
-   curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-   ```
-
-4. **Access to kubeconfig** (usually at `~/.kube/config` on the runner)
-
----
-
-## Verification
-
-After setting up secrets, verify in GitHub Actions:
-
-```yaml
-- name: Verify Secrets
-  run: |
-    echo "Checking if secrets are set..."
-    if [ -z "${{ secrets.PG_STAGING_PASSWORD }}" ]; then
-      echo "❌ PG_STAGING_PASSWORD not set"
-      exit 1
-    fi
-    echo "✅ All required secrets are configured"
-```
-
+The runner does **not** need pre-configured Azure credentials — `ARM_*` env vars are injected from GitHub Secrets at runtime.

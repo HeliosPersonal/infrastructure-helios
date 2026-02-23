@@ -52,12 +52,28 @@ resource "kubernetes_config_map" "app_config" {
   }
 
   data = {
-    POSTGRES_HOST     = local.postgres_staging_host
-    RABBITMQ_HOST     = local.rabbitmq_staging_host
-    TYPESENSE_URL     = local.typesense_staging_url
+    # Shared PostgreSQL - specify your own database name
+    POSTGRES_HOST     = local.postgres_host
+    POSTGRES_PORT     = tostring(local.postgres_port)
+    POSTGRES_DATABASE = "staging_overflow"  # Apps create their own databases
+    
+    # Shared RabbitMQ - specify your own vhost
+    RABBITMQ_HOST     = local.rabbitmq_host
+    RABBITMQ_PORT     = tostring(local.rabbitmq_amqp_port)
+    RABBITMQ_VHOST    = "staging"  # or "staging-overflow" for isolation
+    
+    # Shared Typesense - use collection prefixes
+    TYPESENSE_URL            = local.typesense_url
+    TYPESENSE_COLLECTION_PREFIX = "staging_overflow_"  # e.g., staging_overflow_questions
+    
+    # Keycloak
     KEYCLOAK_URL      = local.keycloak_external_url
     KEYCLOAK_INTERNAL = local.keycloak_internal_url
+    
+    # Monitoring
     OTLP_ENDPOINT     = local.otlp_grpc_endpoint
+    
+    # Ollama (staging only)
     OLLAMA_URL        = local.ollama_staging_url
   }
 }

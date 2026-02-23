@@ -9,14 +9,9 @@
 # NAMESPACE OUTPUTS
 # ====================================================================================
 
-output "namespace_infra_staging" {
-  value       = kubernetes_namespace.infra_staging.metadata[0].name
-  description = "Infrastructure staging namespace name"
-}
-
 output "namespace_infra_production" {
   value       = kubernetes_namespace.infra_production.metadata[0].name
-  description = "Infrastructure production namespace name"
+  description = "Shared infrastructure namespace (all infrastructure services run here)"
 }
 
 output "namespace_apps_staging" {
@@ -33,45 +28,19 @@ output "namespace_apps_production" {
 # POSTGRESQL OUTPUTS
 # ====================================================================================
 
-output "postgres_staging_host" {
-  value       = "postgres-staging.${kubernetes_namespace.infra_staging.metadata[0].name}.svc.cluster.local"
-  description = "PostgreSQL staging internal hostname"
+output "postgres_host" {
+  value       = "postgres.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local"
+  description = "PostgreSQL shared instance hostname (applications create their own databases)"
 }
 
-output "postgres_staging_port" {
+output "postgres_port" {
   value       = 5432
-  description = "PostgreSQL staging port"
+  description = "PostgreSQL port"
 }
 
-output "postgres_staging_database" {
-  value       = var.pg_staging_database
-  description = "PostgreSQL staging database name"
-}
-
-output "postgres_staging_connection_string" {
-  value       = "Host=postgres-staging.${kubernetes_namespace.infra_staging.metadata[0].name}.svc.cluster.local;Port=5432;Database=${var.pg_staging_database};Username=postgres"
-  description = "PostgreSQL staging connection string (without password)"
-  sensitive   = false
-}
-
-output "postgres_production_host" {
-  value       = "postgres-production.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local"
-  description = "PostgreSQL production internal hostname"
-}
-
-output "postgres_production_port" {
-  value       = 5432
-  description = "PostgreSQL production port"
-}
-
-output "postgres_production_database" {
-  value       = var.pg_production_database
-  description = "PostgreSQL production database name"
-}
-
-output "postgres_production_connection_string" {
-  value       = "Host=postgres-production.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local;Port=5432;Database=${var.pg_production_database};Username=postgres"
-  description = "PostgreSQL production connection string (without password)"
+output "postgres_connection_string" {
+  value       = "Host=postgres.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local;Port=5432;Username=postgres"
+  description = "PostgreSQL connection string template (applications specify their own database name)"
   sensitive   = false
 }
 
@@ -79,40 +48,24 @@ output "postgres_production_connection_string" {
 # RABBITMQ OUTPUTS
 # ====================================================================================
 
-output "rabbitmq_staging_host" {
-  value       = "rabbitmq-staging.${kubernetes_namespace.infra_staging.metadata[0].name}.svc.cluster.local"
-  description = "RabbitMQ staging internal hostname"
+output "rabbitmq_host" {
+  value       = "rabbitmq.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local"
+  description = "RabbitMQ shared instance hostname (applications create their own vhosts)"
 }
 
-output "rabbitmq_staging_amqp_port" {
+output "rabbitmq_amqp_port" {
   value       = 5672
-  description = "RabbitMQ staging AMQP port"
+  description = "RabbitMQ AMQP port"
 }
 
-output "rabbitmq_staging_management_port" {
+output "rabbitmq_management_port" {
   value       = 15672
-  description = "RabbitMQ staging management UI port"
+  description = "RabbitMQ management UI port"
 }
 
-output "rabbitmq_staging_connection_string" {
-  value       = "amqp://admin@rabbitmq-staging.${kubernetes_namespace.infra_staging.metadata[0].name}.svc.cluster.local:5672"
-  description = "RabbitMQ staging connection string (without password)"
-  sensitive   = false
-}
-
-output "rabbitmq_production_host" {
-  value       = "rabbitmq-production.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local"
-  description = "RabbitMQ production internal hostname"
-}
-
-output "rabbitmq_production_amqp_port" {
-  value       = 5672
-  description = "RabbitMQ production AMQP port"
-}
-
-output "rabbitmq_production_connection_string" {
-  value       = "amqp://admin@rabbitmq-production.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local:5672"
-  description = "RabbitMQ production connection string (without password)"
+output "rabbitmq_connection_string" {
+  value       = "amqp://admin@rabbitmq.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local:5672"
+  description = "RabbitMQ connection string template (applications specify their own vhost)"
   sensitive   = false
 }
 
@@ -120,34 +73,19 @@ output "rabbitmq_production_connection_string" {
 # TYPESENSE OUTPUTS
 # ====================================================================================
 
-output "typesense_staging_host" {
-  value       = "typesense.${kubernetes_namespace.infra_staging.metadata[0].name}.svc.cluster.local"
-  description = "Typesense staging internal hostname"
-}
-
-output "typesense_staging_port" {
-  value       = 8108
-  description = "Typesense staging port"
-}
-
-output "typesense_staging_url" {
-  value       = "http://typesense.${kubernetes_namespace.infra_staging.metadata[0].name}.svc.cluster.local:8108"
-  description = "Typesense staging URL"
-}
-
-output "typesense_production_host" {
+output "typesense_host" {
   value       = "typesense.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local"
-  description = "Typesense production internal hostname"
+  description = "Typesense shared instance hostname (applications use collection prefixes for isolation)"
 }
 
-output "typesense_production_port" {
+output "typesense_port" {
   value       = 8108
-  description = "Typesense production port"
+  description = "Typesense port"
 }
 
-output "typesense_production_url" {
+output "typesense_url" {
   value       = "http://typesense.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local:8108"
-  description = "Typesense production URL"
+  description = "Typesense URL"
 }
 
 # ====================================================================================

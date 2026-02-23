@@ -10,7 +10,10 @@
 # ========================================
 
 locals {
-  keycloak_internal_host = "${var.keycloak_subdomain}.${var.internal_domain}"
+  keycloak_host            = "${var.keycloak_subdomain}.${var.base_domain}"
+  rabbitmq_host            = "rabbit.${var.base_domain}"
+  typesense_dashboard_host = "typesense.${var.base_domain}"
+  typesense_api_host       = "typesense-api.${var.base_domain}"
 }
 
 ############################
@@ -26,6 +29,32 @@ resource "helm_release" "ingress_nginx" {
   chart            = "ingress-nginx"
   version          = "4.14.0"
   create_namespace = false
+
+  set {
+    name  = "controller.config.ssl-redirect"
+    value = "true"
+  }
+
+  set {
+    name  = "controller.config.force-ssl-redirect"
+    value = "true"
+  }
+}
+
+resource "kubernetes_secret_v1" "cloudflare_origin" {
+  metadata {
+    name      = "cloudflare-origin"
+    namespace = kubernetes_namespace.infra_production.metadata[0].name
+  }
+
+  type = "kubernetes.io/tls"
+
+  binary_data = {
+    "tls.crt" = filebase64("${path.module}/certs/origin.crt")
+    "tls.key" = filebase64("${path.module}/certs/origin.key")
+  }
+
+  depends_on = [kubernetes_namespace.infra_production]
 }
 
 ############################
@@ -35,7 +64,7 @@ resource "helm_release" "ingress_nginx" {
 # Used by both staging and production environments.
 
 resource "kubernetes_ingress_v1" "keycloak_global" {
-  depends_on = [kubernetes_namespace.infra_production, helm_release.ingress_nginx, helm_release.keycloak]
+  depends_on = [kubernetes_namespace.infra_production, helm_release.ingress_nginx, helm_release.keycloak, kubernetes_secret_v1.cloudflare_origin]
 
   metadata {
     name      = "keycloak-global"
@@ -44,12 +73,10 @@ resource "kubernetes_ingress_v1" "keycloak_global" {
       app = "keycloak"
     }
     annotations = {
-      "cert-manager.io/cluster-issuer"                      = "letsencrypt-production"
+      # SSL/TLS handled by Cloudflare - no cert-manager needed
       "nginx.ingress.kubernetes.io/proxy-buffer-size"       = "128k"
       "nginx.ingress.kubernetes.io/proxy-buffers-number"    = "4"
       "nginx.ingress.kubernetes.io/proxy-busy-buffers-size" = "256k"
-      "nginx.ingress.kubernetes.io/ssl-redirect"            = "true"
-      "nginx.ingress.kubernetes.io/force-ssl-redirect"      = "true"
       "nginx.ingress.kubernetes.io/backend-protocol"        = "HTTP"
       "nginx.ingress.kubernetes.io/upstream-vhost"          = "$host"
     }
@@ -59,14 +86,12 @@ resource "kubernetes_ingress_v1" "keycloak_global" {
     ingress_class_name = "nginx"
 
     tls {
-      hosts = [
-        "${var.keycloak_subdomain}.${var.base_domain}"
-      ]
-      secret_name = "keycloak-tls"
+      secret_name = kubernetes_secret_v1.cloudflare_origin.metadata[0].name
+      hosts       = [local.keycloak_host]
     }
 
     rule {
-      host = "${var.keycloak_subdomain}.${var.base_domain}"
+      host = local.keycloak_host
 
       http {
         path {
@@ -85,44 +110,31 @@ resource "kubernetes_ingress_v1" "keycloak_global" {
       }
     }
 
-    rule {
-      host = local.keycloak_internal_host
-
-      http {
-        path {
-          path      = "/"
-          path_type = "Prefix"
-
-          backend {
-            service {
-              name = "keycloak"
-              port {
-                number = 8080
-              }
-            }
-          }
-        }
-      }
-    }
   }
 }
 
 ############################
-# STAGING INFRASTRUCTURE INGRESSES
+# INFRASTRUCTURE INGRESSES
 ############################
+# Exposes management UIs and APIs for shared infrastructure services
 
-# RabbitMQ Management UI (Staging)
-resource "kubernetes_ingress_v1" "rabbitmq_staging" {
+# RabbitMQ Management UI
+resource "kubernetes_ingress_v1" "rabbitmq" {
   metadata {
-    name      = "rabbitmq-staging"
-    namespace = kubernetes_namespace.infra_staging.metadata[0].name
+    name      = "rabbitmq"
+    namespace = kubernetes_namespace.infra_production.metadata[0].name
   }
 
   spec {
     ingress_class_name = "nginx"
 
+    tls {
+      secret_name = kubernetes_secret_v1.cloudflare_origin.metadata[0].name
+      hosts       = [local.rabbitmq_host]
+    }
+
     rule {
-      host = "rabbit-staging.${var.internal_domain}"
+      host = local.rabbitmq_host
 
       http {
         path {
@@ -131,7 +143,7 @@ resource "kubernetes_ingress_v1" "rabbitmq_staging" {
 
           backend {
             service {
-              name = "rabbitmq-staging"
+              name = "rabbitmq"
               port {
                 number = 15672
               }
@@ -142,21 +154,26 @@ resource "kubernetes_ingress_v1" "rabbitmq_staging" {
     }
   }
 
-  depends_on = [helm_release.rabbitmq_staging]
+  depends_on = [kubernetes_namespace.infra_production, helm_release.rabbitmq, helm_release.ingress_nginx, kubernetes_secret_v1.cloudflare_origin]
 }
 
-# Typesense Dashboard (Staging)
-resource "kubernetes_ingress_v1" "typesense_dashboard_staging" {
+# Typesense Dashboard UI
+resource "kubernetes_ingress_v1" "typesense_dashboard" {
   metadata {
-    name      = "typesense-dashboard-staging"
-    namespace = kubernetes_namespace.infra_staging.metadata[0].name
+    name      = "typesense-dashboard"
+    namespace = kubernetes_namespace.infra_production.metadata[0].name
   }
 
   spec {
     ingress_class_name = "nginx"
 
+    tls {
+      secret_name = kubernetes_secret_v1.cloudflare_origin.metadata[0].name
+      hosts       = [local.typesense_dashboard_host]
+    }
+
     rule {
-      host = "typesense-staging.${var.internal_domain}"
+      host = local.typesense_dashboard_host
 
       http {
         path {
@@ -176,14 +193,14 @@ resource "kubernetes_ingress_v1" "typesense_dashboard_staging" {
     }
   }
 
-  depends_on = [kubernetes_deployment.typesense_dashboard_staging]
+  depends_on = [kubernetes_deployment.typesense_dashboard, kubernetes_secret_v1.cloudflare_origin]
 }
 
-# Typesense API Endpoint (Staging)
-resource "kubernetes_ingress_v1" "typesense_api_endpoint_staging" {
+# Typesense API endpoint
+resource "kubernetes_ingress_v1" "typesense_api" {
   metadata {
-    name      = "typesense-api-staging"
-    namespace = kubernetes_namespace.infra_staging.metadata[0].name
+    name      = "typesense-api"
+    namespace = kubernetes_namespace.infra_production.metadata[0].name
     annotations = {
       "nginx.ingress.kubernetes.io/cors-allow-origin"  = "*"
       "nginx.ingress.kubernetes.io/cors-allow-methods" = "GET, POST, PUT, DELETE, OPTIONS"
@@ -195,8 +212,13 @@ resource "kubernetes_ingress_v1" "typesense_api_endpoint_staging" {
   spec {
     ingress_class_name = "nginx"
 
+    tls {
+      secret_name = kubernetes_secret_v1.cloudflare_origin.metadata[0].name
+      hosts       = [local.typesense_api_host]
+    }
+
     rule {
-      host = "typesense-api-staging.${var.internal_domain}"
+      host = local.typesense_api_host
 
       http {
         path {
@@ -216,118 +238,5 @@ resource "kubernetes_ingress_v1" "typesense_api_endpoint_staging" {
     }
   }
 
-  depends_on = [kubernetes_stateful_set.typesense_staging]
+  depends_on = [kubernetes_namespace.infra_production, kubernetes_stateful_set.typesense, helm_release.ingress_nginx, kubernetes_secret_v1.cloudflare_origin]
 }
-
-############################
-# PRODUCTION INFRASTRUCTURE INGRESSES
-############################
-
-# RabbitMQ Management UI (Production)
-resource "kubernetes_ingress_v1" "rabbitmq_production" {
-  metadata {
-    name      = "rabbitmq-production"
-    namespace = kubernetes_namespace.infra_production.metadata[0].name
-  }
-
-  spec {
-    ingress_class_name = "nginx"
-
-    rule {
-      host = "rabbit.${var.internal_domain}"
-
-      http {
-        path {
-          path      = "/"
-          path_type = "Prefix"
-
-          backend {
-            service {
-              name = "rabbitmq-production"
-              port {
-                number = 15672
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [kubernetes_namespace.infra_production, helm_release.rabbitmq_production, helm_release.ingress_nginx]
-}
-
-# Typesense Dashboard (Production)
-resource "kubernetes_ingress_v1" "typesense_dashboard_ui_production" {
-  metadata {
-    name      = "typesense-dashboard-ui"
-    namespace = kubernetes_namespace.infra_production.metadata[0].name
-  }
-
-  spec {
-    ingress_class_name = "nginx"
-
-    rule {
-      host = "typesense.${var.internal_domain}"
-
-      http {
-        path {
-          path      = "/"
-          path_type = "Prefix"
-
-          backend {
-            service {
-              name = "typesense-dashboard"
-              port {
-                number = 80
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [kubernetes_deployment.typesense_dashboard_production]
-}
-
-# Typesense API endpoint (Production)
-resource "kubernetes_ingress_v1" "typesense_api_endpoint_production" {
-  metadata {
-    name      = "typesense-api-production"
-    namespace = kubernetes_namespace.infra_production.metadata[0].name
-    annotations = {
-      "nginx.ingress.kubernetes.io/cors-allow-origin"  = "*"
-      "nginx.ingress.kubernetes.io/cors-allow-methods" = "GET, POST, PUT, DELETE, OPTIONS"
-      "nginx.ingress.kubernetes.io/cors-allow-headers" = "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-TYPESENSE-API-KEY"
-      "nginx.ingress.kubernetes.io/enable-cors"        = "true"
-    }
-  }
-
-  spec {
-    ingress_class_name = "nginx"
-
-    rule {
-      host = "typesense-api.${var.internal_domain}"
-
-      http {
-        path {
-          path      = "/"
-          path_type = "Prefix"
-
-          backend {
-            service {
-              name = "typesense"
-              port {
-                number = 8108
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [kubernetes_namespace.infra_production, kubernetes_stateful_set.typesense_production, helm_release.ingress_nginx]
-}
-

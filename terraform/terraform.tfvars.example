@@ -15,8 +15,6 @@ internal_domain    = "helios"
 keycloak_subdomain = "keycloak"
 ddns_subdomains    = ["www", "staging", "keycloak"]
 
-# Let's Encrypt
-letsencrypt_email = "admin@example.com"
 
 # PostgreSQL
 pg_staging_database    = "stagingdb"
@@ -32,14 +30,6 @@ typesense_storage_size = "5Gi"
 
 # Keycloak
 keycloak_admin_user = "admin"
-
-# Grafana Cloud
-grafana_cloud_prometheus_url  = "https://prometheus-prod-XX-XX.grafana.net"
-grafana_cloud_prometheus_user = "123456"
-grafana_cloud_loki_url        = "https://logs-prod-XX.grafana.net"
-grafana_cloud_loki_user       = "123456"
-grafana_cloud_tempo_url       = "https://tempo-prod-XX.grafana.net:443"
-grafana_cloud_tempo_user      = "123456"
 
 # Ollama
 ollama_enabled            = true
@@ -75,6 +65,12 @@ ollama_cpu_limit          = "4000m"
 # keycloak_admin_password    = "your-keycloak-admin-password"
 # keycloak_postgres_password = "your-keycloak-db-password"
 
-# Grafana Cloud
-# grafana_cloud_api_token = "your-grafana-cloud-token"
+# Grafana Cloud (get these from your Grafana Cloud dashboard)
+# grafana_cloud_api_token       = "your-grafana-cloud-token"
+# grafana_cloud_prometheus_url  = "https://prometheus-prod-XX-XX.grafana.net"
+# grafana_cloud_prometheus_user = "123456"
+# grafana_cloud_loki_url        = "https://logs-prod-XX.grafana.net"
+# grafana_cloud_loki_user       = "123456"
+# grafana_cloud_tempo_url       = "https://tempo-prod-XX.grafana.net:443"
+# grafana_cloud_tempo_user      = "123456"
 

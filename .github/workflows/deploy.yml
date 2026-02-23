@@ -2,37 +2,43 @@ name: Deploy Infrastructure
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'terraform/**'
       - '.github/workflows/deploy.yml'
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'terraform/**'
   workflow_dispatch:
     inputs:
       action:
-        description: 'Terraform action to perform'
+        description: 'Action to perform'
         required: true
         default: 'plan'
         type: choice
-        options:
-          - plan
-          - apply
-          - destroy
+        options: [ plan, destroy ]
+
+concurrency:
+  group: terraform-infra
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
 
 env:
+  # Azure backend auth
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+  # Terraform variables
   TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  TF_VAR_letsencrypt_email: ${{ secrets.LETSENCRYPT_EMAIL }}
-  TF_VAR_pg_staging_password: ${{ secrets.PG_STAGING_PASSWORD }}
-  TF_VAR_pg_production_password: ${{ secrets.PG_PRODUCTION_PASSWORD }}
-  TF_VAR_rabbit_staging_password: ${{ secrets.RABBIT_STAGING_PASSWORD }}
-  TF_VAR_rabbit_production_password: ${{ secrets.RABBIT_PRODUCTION_PASSWORD }}
-  TF_VAR_typesense_staging_api_key: ${{ secrets.TYPESENSE_STAGING_API_KEY }}
-  TF_VAR_typesense_production_api_key: ${{ secrets.TYPESENSE_PRODUCTION_API_KEY }}
+  TF_VAR_pg_password: ${{ secrets.PG_PASSWORD }}
+  TF_VAR_rabbit_password: ${{ secrets.RABBIT_PASSWORD }}
+  TF_VAR_typesense_api_key: ${{ secrets.TYPESENSE_API_KEY }}
   TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
   TF_VAR_keycloak_postgres_password: ${{ secrets.KEYCLOAK_POSTGRES_PASSWORD }}
   TF_VAR_grafana_cloud_api_token: ${{ secrets.GRAFANA_CLOUD_API_TOKEN }}
@@ -42,14 +48,21 @@ env:
   TF_VAR_grafana_cloud_loki_user: ${{ secrets.GRAFANA_CLOUD_LOKI_USER }}
   TF_VAR_grafana_cloud_tempo_url: ${{ secrets.GRAFANA_CLOUD_TEMPO_URL }}
   TF_VAR_grafana_cloud_tempo_user: ${{ secrets.GRAFANA_CLOUD_TEMPO_USER }}
-  TF_VAR_base_domain: ${{ vars.BASE_DOMAIN }}
-  TF_VAR_internal_domain: ${{ vars.INTERNAL_DOMAIN }}
-  TF_VAR_keycloak_subdomain: ${{ vars.KEYCLOAK_SUBDOMAIN }}
+  TF_VAR_base_domain: ${{ secrets.BASE_DOMAIN }}
+  TF_VAR_internal_domain: ${{ secrets.INTERNAL_DOMAIN }}
+  TF_VAR_keycloak_subdomain: ${{ secrets.KEYCLOAK_SUBDOMAIN }}
 
 jobs:
-  terraform:
-    name: Terraform
+  # ------------------------------------------------------------
+  # PLAN — runs on push/pr (and manual plan if needed)
+  # ------------------------------------------------------------
+  plan:
+    name: Terraform Plan
     runs-on: self-hosted
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
     defaults:
       run:
         working-directory: terraform
@@ -58,81 +71,132 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.5"
+      - name: Setup Kubeconfig
+        run: |
+          set -e
+          if [ -z "${{ secrets.KUBECONFIG }}" ]; then
+            echo "ERROR: KUBECONFIG secret is not set"
+            exit 1
+          fi
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
+          echo "TF_VAR_kubeconfig_path=$HOME/.kube/config" >> $GITHUB_ENV
 
-      - name: Terraform Format Check
-        id: fmt
-        run: terraform fmt -check -recursive
-        continue-on-error: true
+      - name: Verify Kubernetes Access
+        run: kubectl cluster-info
+
+      - name: Restore Cloudflare Origin Certificates
+        run: |
+          set -e
+          mkdir -p certs
+          echo "${{ secrets.CLOUDFLARE_ORIGIN_CRT }}" | base64 -d > certs/origin.crt
+          echo "${{ secrets.CLOUDFLARE_ORIGIN_KEY }}" | base64 -d > certs/origin.key
+          chmod 600 certs/origin.crt certs/origin.key
 
       - name: Terraform Init
-        id: init
         run: terraform init
 
       - name: Terraform Validate
-        id: validate
         run: terraform validate
 
       - name: Terraform Plan
-        id: plan
-        run: |
-          terraform plan \
-            -var-file="terraform.tfvars" \
-            -out=tfplan \
-            -no-color
-        continue-on-error: true
+        run: terraform plan -out=tfplan -no-color | tee plan.txt
 
-      - name: Comment PR with Plan
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const output = `#### Terraform Format 🖌\`${{ steps.fmt.outcome }}\`
-            #### Terraform Init ⚙️\`${{ steps.init.outcome }}\`
-            #### Terraform Validate 🤖\`${{ steps.validate.outcome }}\`
-            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
-
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${{ steps.plan.outputs.stdout }}
-            \`\`\`
-
-            </details>
-
-            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-
-      - name: Terraform Apply
-        if: |
-          (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-        run: terraform apply -auto-approve tfplan
-
-      - name: Terraform Destroy
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-        run: |
-          terraform destroy \
-            -var-file="terraform.tfvars" \
-            -auto-approve
-
-      - name: Terraform Output
-        if: success() && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
-        run: terraform output -json > ../outputs.json
-
-      - name: Upload Outputs
-        if: success() && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+      - name: Upload Plan Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-outputs
-          path: outputs.json
-          retention-days: 30
+          name: tfplan-${{ github.run_id }}
+          path: |
+            terraform/tfplan
+            terraform/plan.txt
+          retention-days: 7
+
+  # ------------------------------------------------------------
+  # APPLY — classic flow: after plan, on push to main, wait for approval
+  # ------------------------------------------------------------
+  apply:
+    name: Terraform Apply
+    runs-on: self-hosted
+    needs: plan
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Kubeconfig
+        run: |
+          set -e
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
+          echo "TF_VAR_kubeconfig_path=$HOME/.kube/config" >> $GITHUB_ENV
+
+      - name: Restore Cloudflare Origin Certificates
+        run: |
+          set -e
+          mkdir -p certs
+          echo "${{ secrets.CLOUDFLARE_ORIGIN_CRT }}" | base64 -d > certs/origin.crt
+          echo "${{ secrets.CLOUDFLARE_ORIGIN_KEY }}" | base64 -d > certs/origin.key
+          chmod 600 certs/origin.crt certs/origin.key
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ github.run_id }}
+          path: terraform/
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+  # ------------------------------------------------------------
+  # DESTROY — manual only, gated
+  # ------------------------------------------------------------
+  destroy:
+    name: Terraform Destroy
+    runs-on: self-hosted
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment:
+      name: production
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Kubeconfig
+        run: |
+          set -e
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
+          echo "TF_VAR_kubeconfig_path=$HOME/.kube/config" >> $GITHUB_ENV
+
+      - name: Restore Cloudflare Origin Certificates
+        run: |
+          set -e
+          mkdir -p certs
+          echo "${{ secrets.CLOUDFLARE_ORIGIN_CRT }}" | base64 -d > certs/origin.crt
+          echo "${{ secrets.CLOUDFLARE_ORIGIN_KEY }}" | base64 -d > certs/origin.key
+          chmod 600 certs/origin.crt certs/origin.key
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve

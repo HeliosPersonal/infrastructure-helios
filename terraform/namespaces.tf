@@ -5,17 +5,6 @@
 # Namespaces organize resources into logical groups for staging/production environments
 # ====================================================================================
 
-# Infrastructure namespace for staging environment (databases, message queues, search)
-resource "kubernetes_namespace" "infra_staging" {
-  metadata {
-    name = "infra-staging"
-    labels = {
-      environment = "staging"
-      layer       = "infrastructure"
-    }
-  }
-}
-
 # Application services namespace for staging environment
 resource "kubernetes_namespace" "apps_staging" {
   metadata {
@@ -27,7 +16,8 @@ resource "kubernetes_namespace" "apps_staging" {
   }
 }
 
-# Infrastructure namespace for production environment (databases, message queues, search)
+# Infrastructure namespace for production environment (shared databases, message queues, search)
+# All infrastructure services run here - applications connect and create their own databases/vhosts/collections
 resource "kubernetes_namespace" "infra_production" {
   metadata {
     name = "infra-production"
@@ -49,15 +39,6 @@ resource "kubernetes_namespace" "apps_production" {
   }
 }
 
-# Dedicated namespace for Typesense search engine system resources
-resource "kubernetes_namespace" "typesense_system" {
-  metadata {
-    name = "typesense-system"
-    labels = {
-      layer = "infrastructure"
-    }
-  }
-}
 
 # Ingress controller namespace for managing external access to services
 resource "kubernetes_namespace" "ingress" {

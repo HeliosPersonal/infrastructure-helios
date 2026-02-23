@@ -67,37 +67,25 @@ resource "local_file" "ollama_values" {
   EOT
 }
 
-# Add Ollama Helm repository
-resource "null_resource" "ollama_repo" {
-  count = var.ollama_enabled ? 1 : 0
-
-  provisioner "local-exec" {
-    command = "helm repo add ollama https://otwld.github.io/ollama-helm/ --force-update && helm repo update"
-  }
-
-  triggers = {
-    always_run = timestamp()
-  }
-}
 
 # Deploy Ollama using Helm
 resource "helm_release" "ollama_staging" {
-  count            = var.ollama_enabled ? 1 : 0
-  name             = "ollama"
-  repository       = "https://otwld.github.io/ollama-helm/"
-  chart            = "ollama"
-  version          = var.ollama_helm_chart_version
-  namespace        = kubernetes_namespace.apps_staging.metadata[0].name
-  
+  count      = var.ollama_enabled ? 1 : 0
+  name       = "ollama"
+  repository = "https://otwld.github.io/ollama-helm/"
+  chart      = "ollama"
+  version    = var.ollama_helm_chart_version
+  namespace  = kubernetes_namespace.apps_staging.metadata[0].name
+
   # Force recreation if values change significantly
-  recreate_pods    = true
-  cleanup_on_fail  = true
-  replace          = false
-  
+  recreate_pods   = true
+  cleanup_on_fail = true
+  replace         = false
+
   # Wait for deployment to be ready
-  wait             = true
-  wait_for_jobs    = true
-  timeout          = 600
+  wait          = true
+  wait_for_jobs = true
+  timeout       = 600
 
   values = [
     local_file.ollama_values[0].content
@@ -115,8 +103,7 @@ resource "helm_release" "ollama_staging" {
 
   depends_on = [
     local_file.ollama_values,
-    kubernetes_namespace.apps_staging,
-    null_resource.ollama_repo
+    kubernetes_namespace.apps_staging
   ]
 }
 

@@ -58,45 +58,21 @@ variable "cloudflare_api_token" {
   description = "Cloudflare API token for DDNS updates"
 }
 
-# ====================================================================================
-# LET'S ENCRYPT CONFIGURATION
-# ====================================================================================
-
-variable "letsencrypt_email" {
-  type        = string
-  description = "Email address for Let's Encrypt certificate notifications and account recovery"
-}
 
 # ====================================================================================
 # POSTGRESQL CONFIGURATION
 # ====================================================================================
 
-variable "pg_staging_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "pg_production_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "pg_staging_database" {
+variable "pg_password" {
   type        = string
-  default     = "stagingdb"
-  description = "Database name for staging PostgreSQL"
-}
-
-variable "pg_production_database" {
-  type        = string
-  default     = "productiondb"
-  description = "Database name for production PostgreSQL"
+  sensitive   = true
+  description = "PostgreSQL admin password for shared instance"
 }
 
 variable "pg_storage_size" {
   type        = string
-  default     = "10Gi"
-  description = "Persistent volume size for PostgreSQL"
+  default     = "20Gi"
+  description = "Persistent volume size for PostgreSQL (increased for shared instance)"
 }
 
 variable "pg_storage_class" {
@@ -109,40 +85,32 @@ variable "pg_storage_class" {
 # RABBITMQ CONFIGURATION
 # ====================================================================================
 
-variable "rabbit_staging_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "rabbit_production_password" {
-  type      = string
-  sensitive = true
+variable "rabbit_password" {
+  type        = string
+  sensitive   = true
+  description = "RabbitMQ admin password for shared instance"
 }
 
 variable "rabbit_persistence_size" {
   type        = string
-  default     = "5Gi"
-  description = "Persistent volume size for RabbitMQ"
+  default     = "8Gi"
+  description = "Persistent volume size for RabbitMQ (increased for shared instance)"
 }
 
 # ====================================================================================
 # TYPESENSE CONFIGURATION
 # ====================================================================================
 
-variable "typesense_staging_api_key" {
-  type      = string
-  sensitive = true
-}
-
-variable "typesense_production_api_key" {
-  type      = string
-  sensitive = true
+variable "typesense_api_key" {
+  type        = string
+  sensitive   = true
+  description = "Typesense API key for shared instance (applications use collection prefixes for isolation)"
 }
 
 variable "typesense_storage_size" {
   type        = string
-  default     = "5Gi"
-  description = "Persistent volume size for Typesense"
+  default     = "15Gi"
+  description = "Persistent volume size for Typesense (increased for shared instance)"
 }
 
 # ====================================================================================

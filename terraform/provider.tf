@@ -1,17 +1,15 @@
-# ====================================================================================
-# TERRAFORM PROVIDER CONFIGURATION
-# ====================================================================================
-# Configures required providers and Kubernetes backend for state storage
-# ====================================================================================
-
 terraform {
   required_version = ">= 1.5"
 
-  # Store state in Kubernetes secret
-  backend "kubernetes" {
-    secret_suffix = "infrastructure-helios"
-    namespace     = "kube-system"
-    config_path   = "~/.kube/config"
+  # State stored in Azure Blob Storage.
+  # Auth via ARM_* env vars — set locally in ~/.config/fish/conf.d/azure-terraform.fish
+  # or injected from GitHub Secrets in CI/CD.
+  backend "azurerm" {
+    resource_group_name  = "rg-helios-tfstate"
+    storage_account_name = "stheliosinfrastate"
+    container_name       = "tfstate"
+    key                  = "infrastructure-helios.tfstate"
+    use_azuread_auth     = true
   }
 
   required_providers {
@@ -34,15 +32,12 @@ terraform {
   }
 }
 
-# Kubernetes provider configuration using kubeconfig file
 provider "kubernetes" {
   config_path = var.kubeconfig_path
 }
 
-# Helm provider configuration for chart deployments
 provider "helm" {
   kubernetes {
     config_path = var.kubeconfig_path
   }
 }
-

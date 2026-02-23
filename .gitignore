@@ -4,7 +4,6 @@
 *.tfvars
 !*.tfvars.example
 .terraform/
-.terraform.lock.hcl
 crash.log
 crash.*.log
 override.tf
@@ -17,9 +16,18 @@ terraform.rc
 # Secrets
 *.secret.*
 *secret*.tfvars
+.env.*
+
+# Cloudflare Origin Certificates
+certs/
+certs/*.crt
+certs/*.key
+
+# Kubeconfig
+.kube/
 
 # Generated values (managed by Terraform)
-terraform/values/ollama-values.yaml
+# Note: ollama-values.yaml is committed so CI checkout has it and terraform plan shows no drift
 
 # IDE
 .idea/
@@ -34,4 +42,5 @@ Thumbs.db
 
 # Logs
 *.log
+ci-cd-logs/
 
