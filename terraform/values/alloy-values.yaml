@@ -42,20 +42,9 @@ alloy:
         }
       }
       
-      // Convert OTLP metrics to Prometheus format
+      // Convert OTLP metrics to Prometheus format and forward directly
       otelcol.exporter.prometheus "default" {
-        forward_to = [prometheus.relabel.drop_expensive_otlp.receiver]
-      }
-
-      // Drop high-cardinality labels from OTLP app metrics
-      prometheus.relabel "drop_expensive_otlp" {
         forward_to = [prometheus.remote_write.grafanacloud.receiver]
-
-        // Drop high-cardinality HTTP route/URL labels
-        rule {
-          action = "labeldrop"
-          regex  = "http_route|http_url|http_target|url_path|net_peer_name|net_peer_port|server_address|server_port|peer_service|db_statement|db_operation|exception_type|exception_message|thread_name|code_function|code_filepath"
-        }
       }
       
       // Basic auth for Grafana Cloud Tempo
@@ -112,74 +101,6 @@ alloy:
         role = "node"
       }
       
-      // Keep only essential cAdvisor metrics (drop 80-90% of container metrics)
-      prometheus.relabel "drop_expensive_cadvisor" {
-        forward_to = [prometheus.remote_write.grafanacloud.receiver]
-
-        // Drop series with no container name (node-level noise)
-        rule {
-          source_labels = ["container"]
-          regex         = "^$"
-          action        = "drop"
-        }
-
-        // Drop the "pause" / sandbox containers
-        rule {
-          source_labels = ["container"]
-          regex         = "POD"
-          action        = "drop"
-        }
-
-        // Keep only the most useful container metrics (reduced set)
-        rule {
-          source_labels = ["__name__"]
-          regex         = "container_(cpu_usage_seconds_total|memory_working_set_bytes|oom_events_total)"
-          action        = "keep"
-        }
-
-        // Drop high-cardinality labels to reduce series count
-        rule {
-          action = "labeldrop"
-          regex  = "id|image|name"
-        }
-      }
-
-      // Keep only essential node-exporter metrics
-      prometheus.relabel "drop_expensive_node" {
-        forward_to = [prometheus.remote_write.grafanacloud.receiver]
-
-        rule {
-          source_labels = ["__name__"]
-          regex         = "node_(cpu_seconds_total|memory_MemAvailable_bytes|memory_MemTotal_bytes|filesystem_avail_bytes|filesystem_size_bytes|load1|load5|load15)"
-          action        = "keep"
-        }
-
-        // For CPU, only keep the "idle" and "user" modes to cut per-mode cardinality
-        rule {
-          source_labels = ["__name__", "mode"]
-          regex         = "node_cpu_seconds_total;(iowait|softirq|irq|steal|nice)"
-          action        = "drop"
-        }
-
-        // Only keep the root filesystem (drop tmpfs, overlayfs, etc.)
-        rule {
-          source_labels = ["__name__", "fstype"]
-          regex         = "node_filesystem.*;(tmpfs|overlay|squashfs|devtmpfs)"
-          action        = "drop"
-        }
-      }
-
-      // Keep only essential kube-state-metrics
-      prometheus.relabel "drop_expensive_ksm" {
-        forward_to = [prometheus.remote_write.grafanacloud.receiver]
-
-        rule {
-          source_labels = ["__name__"]
-          regex         = "kube_(pod_status_phase|pod_status_ready|pod_container_status_restarts_total|deployment_status_replicas_available|deployment_status_replicas_unavailable|deployment_spec_replicas|node_status_condition)"
-          action        = "keep"
-        }
-      }
-
       // Scrape cAdvisor for container metrics
       prometheus.scrape "cadvisor" {
         targets = discovery.kubernetes.nodes.targets
@@ -187,7 +108,7 @@ alloy:
         job_name        = "cadvisor"
         scheme          = "https"
         metrics_path    = "/metrics/cadvisor"
-        scrape_interval = "120s"
+        scrape_interval = "5m"
         
         bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
         
@@ -196,7 +117,7 @@ alloy:
           insecure_skip_verify = false
         }
         
-        forward_to = [prometheus.relabel.drop_expensive_cadvisor.receiver]
+        forward_to = [prometheus.remote_write.grafanacloud.receiver]
       }
       
       // Scrape kube-state-metrics
@@ -213,8 +134,8 @@ alloy:
       prometheus.scrape "kube_state_metrics" {
         targets         = discovery.relabel.kube_state_metrics.output
         job_name        = "kube-state-metrics"
-        scrape_interval = "120s"
-        forward_to      = [prometheus.relabel.drop_expensive_ksm.receiver]
+        scrape_interval = "5m"
+        forward_to      = [prometheus.remote_write.grafanacloud.receiver]
       }
       
       // Scrape node-exporter
@@ -231,8 +152,8 @@ alloy:
       prometheus.scrape "node_exporter" {
         targets         = discovery.relabel.node_exporter.output
         job_name        = "node-exporter"
-        scrape_interval = "120s"
-        forward_to      = [prometheus.relabel.drop_expensive_node.receiver]
+        scrape_interval = "5m"
+        forward_to      = [prometheus.remote_write.grafanacloud.receiver]
       }
       
       // Scrape nginx-ingress-controller
@@ -259,30 +180,12 @@ alloy:
         }
       }
       
-      // Keep only essential nginx-ingress metrics (drop per-path cardinality)
-      prometheus.relabel "drop_expensive_nginx" {
-        forward_to = [prometheus.remote_write.grafanacloud.receiver]
-
-        // Keep only request count + latency summary (no buckets) + process basics
-        rule {
-          source_labels = ["__name__"]
-          regex         = "nginx_ingress_controller_(requests|request_duration_seconds_(count|sum)|nginx_process_(cpu_seconds_total|resident_memory_bytes)|config_last_reload_successful)"
-          action        = "keep"
-        }
-
-        // Drop per-path and per-ingress labels to collapse cardinality
-        rule {
-          action = "labeldrop"
-          regex  = "path|ingress|service"
-        }
-      }
-
       prometheus.scrape "nginx_ingress" {
         targets         = discovery.relabel.nginx_ingress.output
         job_name        = "nginx-ingress"
         metrics_path    = "/metrics"
-        scrape_interval = "120s"
-        forward_to      = [prometheus.relabel.drop_expensive_nginx.receiver]
+        scrape_interval = "5m"
+        forward_to      = [prometheus.remote_write.grafanacloud.receiver]
       }
 
       // ── Pod log tailing (overflow-webapp only) ──────────────────────────────
