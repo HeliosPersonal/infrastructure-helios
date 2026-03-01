@@ -44,7 +44,18 @@ alloy:
       
       // Convert OTLP metrics to Prometheus format
       otelcol.exporter.prometheus "default" {
+        forward_to = [prometheus.relabel.drop_expensive_otlp.receiver]
+      }
+
+      // Drop high-cardinality labels from OTLP app metrics
+      prometheus.relabel "drop_expensive_otlp" {
         forward_to = [prometheus.remote_write.grafanacloud.receiver]
+
+        // Drop high-cardinality HTTP route/URL labels
+        rule {
+          action = "labeldrop"
+          regex  = "http_route|http_url|http_target|url_path|net_peer_name|net_peer_port|server_address|server_port|peer_service|db_statement|db_operation|exception_type|exception_message|thread_name|code_function|code_filepath"
+        }
       }
       
       // Basic auth for Grafana Cloud Tempo
@@ -119,11 +130,17 @@ alloy:
           action        = "drop"
         }
 
-        // Keep only the most useful container metrics
+        // Keep only the most useful container metrics (reduced set)
         rule {
           source_labels = ["__name__"]
-          regex         = "container_(cpu_usage_seconds_total|memory_working_set_bytes|network_receive_bytes_total|network_transmit_bytes_total|fs_usage_bytes|fs_limit_bytes|oom_events_total)"
+          regex         = "container_(cpu_usage_seconds_total|memory_working_set_bytes|oom_events_total)"
           action        = "keep"
+        }
+
+        // Drop high-cardinality labels to reduce series count
+        rule {
+          action = "labeldrop"
+          regex  = "id|image|name"
         }
       }
 
@@ -133,8 +150,22 @@ alloy:
 
         rule {
           source_labels = ["__name__"]
-          regex         = "node_(cpu_seconds_total|memory_MemAvailable_bytes|memory_MemTotal_bytes|memory_MemFree_bytes|memory_Buffers_bytes|memory_Cached_bytes|filesystem_avail_bytes|filesystem_size_bytes|filesystem_free_bytes|network_receive_bytes_total|network_transmit_bytes_total|load1|load5|load15|disk_read_bytes_total|disk_written_bytes_total|uname_info)"
+          regex         = "node_(cpu_seconds_total|memory_MemAvailable_bytes|memory_MemTotal_bytes|filesystem_avail_bytes|filesystem_size_bytes|load1|load5|load15)"
           action        = "keep"
+        }
+
+        // For CPU, only keep the "idle" and "user" modes to cut per-mode cardinality
+        rule {
+          source_labels = ["__name__", "mode"]
+          regex         = "node_cpu_seconds_total;(iowait|softirq|irq|steal|nice)"
+          action        = "drop"
+        }
+
+        // Only keep the root filesystem (drop tmpfs, overlayfs, etc.)
+        rule {
+          source_labels = ["__name__", "fstype"]
+          regex         = "node_filesystem.*;(tmpfs|overlay|squashfs|devtmpfs)"
+          action        = "drop"
         }
       }
 
@@ -144,7 +175,7 @@ alloy:
 
         rule {
           source_labels = ["__name__"]
-          regex         = "kube_(pod_info|pod_status_phase|pod_status_ready|pod_container_status_restarts_total|pod_container_resource_requests|pod_container_resource_limits|deployment_status_replicas_available|deployment_status_replicas_unavailable|deployment_spec_replicas|node_status_condition|node_info|namespace_status_phase|replicaset_status_ready_replicas|job_status_succeeded|job_status_failed)"
+          regex         = "kube_(pod_status_phase|pod_status_ready|pod_container_status_restarts_total|deployment_status_replicas_available|deployment_status_replicas_unavailable|deployment_spec_replicas|node_status_condition)"
           action        = "keep"
         }
       }
@@ -156,7 +187,7 @@ alloy:
         job_name        = "cadvisor"
         scheme          = "https"
         metrics_path    = "/metrics/cadvisor"
-        scrape_interval = "60s"
+        scrape_interval = "120s"
         
         bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
         
@@ -182,7 +213,7 @@ alloy:
       prometheus.scrape "kube_state_metrics" {
         targets         = discovery.relabel.kube_state_metrics.output
         job_name        = "kube-state-metrics"
-        scrape_interval = "60s"
+        scrape_interval = "120s"
         forward_to      = [prometheus.relabel.drop_expensive_ksm.receiver]
       }
       
@@ -200,7 +231,7 @@ alloy:
       prometheus.scrape "node_exporter" {
         targets         = discovery.relabel.node_exporter.output
         job_name        = "node-exporter"
-        scrape_interval = "60s"
+        scrape_interval = "120s"
         forward_to      = [prometheus.relabel.drop_expensive_node.receiver]
       }
       
@@ -232,18 +263,17 @@ alloy:
       prometheus.relabel "drop_expensive_nginx" {
         forward_to = [prometheus.remote_write.grafanacloud.receiver]
 
+        // Keep only request count + latency summary (no buckets) + process basics
         rule {
           source_labels = ["__name__"]
-          regex         = "nginx_ingress_controller_(requests|request_duration_seconds_(bucket|count|sum)|response_size_(bucket|count|sum)|request_size_(bucket|count|sum)|nginx_process_(cpu_seconds_total|virtual_memory_bytes|resident_memory_bytes|connections_total)|success|config_last_reload_successful)"
+          regex         = "nginx_ingress_controller_(requests|request_duration_seconds_(count|sum)|nginx_process_(cpu_seconds_total|resident_memory_bytes)|config_last_reload_successful)"
           action        = "keep"
         }
 
-        // Drop high-cardinality per-path labels - keep only per-host/ingress aggregation
+        // Drop per-path and per-ingress labels to collapse cardinality
         rule {
-          source_labels = ["path"]
-          regex         = ".+"
-          target_label  = "path"
-          replacement   = "dropped"
+          action = "labeldrop"
+          regex  = "path|ingress|service"
         }
       }
 
@@ -251,10 +281,101 @@ alloy:
         targets         = discovery.relabel.nginx_ingress.output
         job_name        = "nginx-ingress"
         metrics_path    = "/metrics"
-        scrape_interval = "60s"
+        scrape_interval = "120s"
         forward_to      = [prometheus.relabel.drop_expensive_nginx.receiver]
       }
+
+      // ── Pod log tailing ──────────────────────────────────────────────────────
+      // Tails stdout/stderr from all pods in apps-staging and apps-production.
+      // Primary log source for overflow-webapp (Next.js stdout) and any service
+      // that writes to stdout rather than shipping logs via OTLP.
+      // Reads /var/log/pods from the host (mounted via hostPath volume below).
+
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pods.targets
+
+        // Only tail pods in our app namespaces
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          regex         = "apps-staging|apps-production"
+          action        = "keep"
+        }
+
+        // Skip pods that are not running
+        rule {
+          source_labels = ["__meta_kubernetes_pod_phase"]
+          regex         = "Pending|Succeeded|Failed|Unknown"
+          action        = "drop"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "app"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_node_name"]
+          target_label  = "node"
+        }
+
+        // Set __path__ to the container log file on the node.
+        // K3s log dir format: /var/log/pods/<namespace>_<podname>_<uid>/<container>/*.log
+        rule {
+          source_labels = [
+            "__meta_kubernetes_namespace",
+            "__meta_kubernetes_pod_uid",
+            "__meta_kubernetes_pod_container_name",
+          ]
+          separator    = "/"
+          target_label = "__path__"
+          replacement  = "/var/log/pods/$1_*_$2/$3/*.log"
+        }
+      }
+
+      loki.source.file "pod_logs" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.process.pod_logs.receiver]
+      }
+
+      loki.process "pod_logs" {
+        // Strip the CRI log prefix (timestamp flags stream) added by containerd/K3s
+        // Line format: 2026-01-01T00:00:00.000Z stdout F <actual log line>
+        stage.cri {}
+
+        // Try to parse as JSON (structured .NET OTLP logs that also write to stdout)
+        // If parsing fails the line passes through unchanged — this handles Next.js
+        // plain-text console.log output without dropping lines.
+        stage.json {
+          expressions = {
+            level   = "level",
+          }
+          drop_malformed = false
+        }
+
+        // Promote the parsed "level" field to a Loki stream label for easy filtering
+        stage.labels {
+          values = {
+            level = "",
+          }
+        }
+
+        forward_to = [loki.write.grafanacloud.receiver]
+      }
+      // ── End pod log tailing ──────────────────────────────────────────────────
   
+  mounts:
+    varlog: true   # mounts /var/log from host → gives access to /var/log/pods
+
   extraPorts:
     - name: "otlp-grpc"
       port: 4317
