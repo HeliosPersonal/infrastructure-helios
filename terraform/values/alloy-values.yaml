@@ -285,11 +285,11 @@ alloy:
         forward_to      = [prometheus.relabel.drop_expensive_nginx.receiver]
       }
 
-      // ── Pod log tailing ──────────────────────────────────────────────────────
-      // Tails stdout/stderr from all pods in apps-staging and apps-production.
-      // Primary log source for overflow-webapp (Next.js stdout) and any service
-      // that writes to stdout rather than shipping logs via OTLP.
-      // Reads /var/log/pods from the host (mounted via hostPath volume below).
+      // ── Pod log tailing (overflow-webapp only) ──────────────────────────────
+      // Only tails overflow-webapp pods. All .NET backend services already ship
+      // logs via OTLP → collecting them here too would cause duplicates in Loki
+      // and pollute labels (their plain-text "info: ..." format doesn't carry a
+      // parseable level field).
 
       discovery.relabel "pod_logs" {
         targets = discovery.kubernetes.pods.targets
@@ -298,6 +298,13 @@ alloy:
         rule {
           source_labels = ["__meta_kubernetes_namespace"]
           regex         = "apps-staging|apps-production"
+          action        = "keep"
+        }
+
+        // Only collect overflow-webapp — .NET services ship logs via OTLP already
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          regex         = "overflow-webapp"
           action        = "keep"
         }
 
@@ -327,54 +334,47 @@ alloy:
           source_labels = ["__meta_kubernetes_pod_node_name"]
           target_label  = "node"
         }
-
-        // Set __path__ to the container log file on the node.
-        // K3s log dir format: /var/log/pods/<namespace>_<podname>_<uid>/<container>/*.log
-        rule {
-          source_labels = [
-            "__meta_kubernetes_namespace",
-            "__meta_kubernetes_pod_uid",
-            "__meta_kubernetes_pod_container_name",
-          ]
-          separator    = "/"
-          target_label = "__path__"
-          replacement  = "/var/log/pods/$1_*_$2/$3/*.log"
-        }
       }
 
-      loki.source.file "pod_logs" {
+      // loki.source.kubernetes reads via the K8s API (no hostPath mount needed).
+      // NOTE: stage.cri {} must NOT be used here — the K8s API already strips the
+      // CRI prefix so stage.cri would drop every line.
+      loki.source.kubernetes "pod_logs" {
         targets    = discovery.relabel.pod_logs.output
         forward_to = [loki.process.pod_logs.receiver]
       }
 
       loki.process "pod_logs" {
-        // Strip the CRI log prefix (timestamp flags stream) added by containerd/K3s
-        // Line format: 2026-01-01T00:00:00.000Z stdout F <actual log line>
-        stage.cri {}
-
-        // Try to parse as JSON (structured .NET OTLP logs that also write to stdout)
-        // If parsing fails the line passes through unchanged — this handles Next.js
-        // plain-text console.log output without dropping lines.
-        stage.json {
-          expressions = {
-            level   = "level",
+        // Default every line to level=info.
+        // loki.source.kubernetes has no stream label so we cannot derive it from there.
+        stage.static_labels {
+          values = {
+            level = "info",
           }
-          drop_malformed = false
         }
 
-        // Promote the parsed "level" field to a Loki stream label for easy filtering
+        // Overwrite to "warn" for lines containing warn keywords.
+        // stage.labels only overwrites when the capture is non-empty —
+        // non-matching lines keep their current label value.
+        stage.regex {
+          expression = "(?i)\\b(?P<level>warn)\\b"
+        }
         stage.labels {
-          values = {
-            level = "",
-          }
+          values = { level = "" }
+        }
+
+        // Overwrite to "error" for lines containing error/failed/exception.
+        stage.regex {
+          expression = "(?i)\\b(?P<level>error|failed|exception)\\b"
+        }
+        stage.labels {
+          values = { level = "" }
         }
 
         forward_to = [loki.write.grafanacloud.receiver]
       }
       // ── End pod log tailing ──────────────────────────────────────────────────
   
-  mounts:
-    varlog: true   # mounts /var/log from host → gives access to /var/log/pods
 
   extraPorts:
     - name: "otlp-grpc"
@@ -409,6 +409,7 @@ rbac:
         - services
         - endpoints
         - pods
+        - pods/log
         - nodes
         - nodes/metrics
         - nodes/stats
