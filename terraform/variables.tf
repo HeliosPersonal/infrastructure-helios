@@ -198,7 +198,7 @@ variable "ollama_image_tag" {
 variable "ollama_default_model" {
   type        = string
   description = "Default LLM model to download on initialization"
-  default     = "phi3.5:mini"
+  default     = "qwen2.5:3b"
 }
 
 variable "ollama_storage_size" {

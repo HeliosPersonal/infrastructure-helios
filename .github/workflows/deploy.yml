@@ -102,7 +102,19 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan -no-color | tee plan.txt
+        run: |
+          set -e
+          PLAN_OUTPUT=$(terraform plan -out=tfplan -no-color 2>&1) && echo "$PLAN_OUTPUT" | tee plan.txt || {
+            LOCK_ID=$(echo "$PLAN_OUTPUT" | grep -o 'ID:.*' | head -1 | awk '{print $2}')
+            if [ -n "$LOCK_ID" ]; then
+              echo "State is locked (ID: $LOCK_ID) — forcing unlock and retrying..."
+              terraform force-unlock -force "$LOCK_ID"
+              terraform plan -out=tfplan -no-color | tee plan.txt
+            else
+              echo "$PLAN_OUTPUT"
+              exit 1
+            fi
+          }
 
       - name: Upload Plan Artifact
         if: always()

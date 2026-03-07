@@ -30,40 +30,56 @@ resource "local_file" "ollama_values" {
         memory: ${var.ollama_memory_limit}
         cpu: ${var.ollama_cpu_limit}
 
-    persistence:
+    # Persistent storage so models survive pod restarts
+    persistentVolume:
       enabled: true
       size: ${var.ollama_storage_size}
-      storageClass: ""  # Use default storage class
-      accessMode: ReadWriteOnce
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
 
-    # Environment variables
-    env:
-      - name: OLLAMA_HOST
-        value: "0.0.0.0:11434"
-
-    # Init container to pull model
-    initModels:
-      enabled: true
+    ollama:
+      # Pull model on container startup (persisted, so only downloads once)
       models:
         - ${var.ollama_default_model}
+
+    # Override command to filter health-check probe noise from logs.
+    # Kubernetes liveness/readiness probes hit GET "/" every few seconds;
+    # GIN always logs them. We pipe stderr+stdout through grep to drop those lines.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /bin/ollama serve 2>&1 | grep -Ev --line-buffered 'GET[[:space:]]+"/"'
+
+    # Environment variables
+    extraEnv:
+      - name: OLLAMA_HOST
+        value: "0.0.0.0:11434"
+      - name: OLLAMA_DEBUG
+        value: "0"
+      - name: GIN_MODE
+        value: "release"
 
     livenessProbe:
       enabled: true
       httpGet:
         path: /
         port: 11434
-      initialDelaySeconds: 30
+      initialDelaySeconds: 60
       periodSeconds: 10
       timeoutSeconds: 5
+      failureThreshold: 6
 
     readinessProbe:
       enabled: true
       httpGet:
         path: /
         port: 11434
-      initialDelaySeconds: 10
+      initialDelaySeconds: 30
       periodSeconds: 5
       timeoutSeconds: 3
+      failureThreshold: 6
   EOT
 }
 
