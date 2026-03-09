@@ -192,7 +192,7 @@ variable "ollama_helm_chart_version" {
 variable "ollama_image_tag" {
   type        = string
   description = "Ollama Docker image tag"
-  default     = "latest"
+  default     = "0.17.7"
 }
 
 variable "ollama_default_model" {
