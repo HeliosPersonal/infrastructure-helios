@@ -64,6 +64,12 @@ Encode with: `base64 -w 0 terraform/certs/origin.crt`
 |---|---|
 | `RABBIT_PASSWORD` | RabbitMQ admin password (shared instance) |
 
+### Redis
+
+| Secret | Description |
+|---|---|
+| `REDIS_PASSWORD` | Redis password (shared instance) |
+
 ### Typesense
 
 | Secret | Description |

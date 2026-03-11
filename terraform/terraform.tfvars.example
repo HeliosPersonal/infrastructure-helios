@@ -57,6 +57,9 @@ ollama_cpu_limit          = "4000m"
 # rabbit_staging_password    = "your-staging-rabbitmq-password"
 # rabbit_production_password = "your-production-rabbitmq-password"
 
+# Redis
+# redis_password = "your-redis-password"
+
 # Typesense API Keys
 # typesense_staging_api_key    = "your-staging-typesense-key"
 # typesense_production_api_key = "your-production-typesense-key"

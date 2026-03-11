@@ -174,6 +174,28 @@ variable "grafana_cloud_tempo_user" {
 }
 
 # ====================================================================================
+# REDIS CONFIGURATION
+# ====================================================================================
+
+variable "redis_password" {
+  type        = string
+  sensitive   = true
+  description = "Redis password for shared instance (applications use key prefixes for isolation)"
+}
+
+variable "redis_storage_size" {
+  type        = string
+  default     = "4Gi"
+  description = "Persistent volume size for Redis AOF/RDB snapshots"
+}
+
+variable "redis_storage_class" {
+  type        = string
+  default     = "local-path"
+  description = "Storage class for Redis persistent volume"
+}
+
+# ====================================================================================
 # OLLAMA LLM SERVICE CONFIGURATION
 # ====================================================================================
 

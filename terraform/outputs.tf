@@ -108,6 +108,26 @@ output "keycloak_admin_user" {
 }
 
 # ====================================================================================
+# REDIS OUTPUTS
+# ====================================================================================
+
+output "redis_host" {
+  value       = "redis.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local"
+  description = "Redis shared instance hostname (applications use key prefixes for isolation)"
+}
+
+output "redis_port" {
+  value       = 6379
+  description = "Redis port"
+}
+
+output "redis_connection_string" {
+  value       = "redis://redis.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local:6379"
+  description = "Redis connection string template (no password — read from secret)"
+  sensitive   = false
+}
+
+# ====================================================================================
 # OLLAMA OUTPUTS
 # ====================================================================================
 

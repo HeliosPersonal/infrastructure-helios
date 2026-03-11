@@ -52,6 +52,27 @@ amqp://admin:PASSWORD@rabbitmq.infra-production.svc.cluster.local:5672/staging
 http://rabbit.helios:15672
 ```
 
+ ### Redis (Shared Instance)
+```yaml
+Host: redis-master.infra-production.svc.cluster.local
+Port: 6379
+Password: <from infrastructure terraform.secret.tfvars>
+Key Namespace: <you define your own prefix>
+```
+
+**Key Naming Convention:**
+```
+staging:<appname>:<purpose>:<id>       # e.g., staging:myapp:session:abc123
+production:<appname>:<purpose>:<id>    # e.g., production:myapp:cache:user:42
+```
+
+**Connection String Template:**
+```
+redis://:PASSWORD@redis-master.infra-production.svc.cluster.local:6379/0
+```
+
+---
+
 ### Typesense (Shared Instance)
 ```yaml
 Host: typesense.infra-production.svc.cluster.local
@@ -172,7 +193,24 @@ curl -u admin:PASSWORD -X PUT \
   http://rabbitmq.infra-production.svc.cluster.local:15672/api/vhosts/staging
 ```
 
-### 3. Create Typesense Collections
+### 3. Set Up Redis Key Namespace
+
+Redis requires no server-side setup — just agree on a key prefix in your app config.
+
+**In your application (environment variables):**
+```bash
+REDIS_HOST=redis-master.infra-production.svc.cluster.local
+REDIS_PORT=6379
+REDIS_KEY_PREFIX=staging:myapp:       # e.g. staging:myapp: or production:myapp:
+```
+
+**Verify connectivity:**
+```bash
+kubectl run -it --rm redis-test --image=redis:7 --restart=Never -- \
+  redis-cli -h redis-master.infra-production.svc.cluster.local -a PASSWORD PING
+```
+
+### 4. Create Typesense Collections
 
 **In your application code:**
 ```javascript
@@ -220,6 +258,8 @@ locals {
   postgres_port     = data.terraform_remote_state.infra.outputs.postgres_port
   rabbitmq_host     = data.terraform_remote_state.infra.outputs.rabbitmq_host
   rabbitmq_port     = data.terraform_remote_state.infra.outputs.rabbitmq_amqp_port
+  redis_host        = data.terraform_remote_state.infra.outputs.redis_host
+  redis_port        = data.terraform_remote_state.infra.outputs.redis_port
   typesense_url     = data.terraform_remote_state.infra.outputs.typesense_url
   keycloak_url      = data.terraform_remote_state.infra.outputs.keycloak_external_url
   
@@ -278,6 +318,11 @@ kubectl create secret generic rabbitmq-password \
   -n apps-staging \
   --from-literal=password='<rabbit_password from infrastructure>'
 
+# Redis password
+kubectl create secret generic redis-password \
+  -n apps-staging \
+  --from-literal=password='<redis_password from infrastructure>'
+
 # Typesense API key
 kubectl create secret generic typesense-api-key \
   -n apps-staging \
@@ -312,6 +357,10 @@ kubectl run -it --rm psql-test --image=postgres:16 --restart=Never -- \
 kubectl run -it --rm rabbitmq-test --image=rabbitmq:management --restart=Never -- \
   rabbitmqadmin -H rabbitmq.infra-production.svc.cluster.local -u admin -p PASSWORD list vhosts
 
+# Test Redis
+kubectl run -it --rm redis-test --image=redis:7 --restart=Never -- \
+  redis-cli -h redis-master.infra-production.svc.cluster.local -a PASSWORD PING
+
 # Test Typesense
 kubectl run -it --rm curl-test --image=curlimages/curl --restart=Never -- \
   curl http://typesense.infra-production.svc.cluster.local:8108/health
@@ -330,9 +379,13 @@ http://postgres.infra-production.svc.cluster.local:9187/metrics
 # RabbitMQ metrics
 http://rabbitmq.infra-production.svc.cluster.local:15692/metrics
 
+# Redis metrics (redis-exporter sidecar)
+http://redis-master.infra-production.svc.cluster.local:9121/metrics
+
 # Check via port-forward
 kubectl port-forward -n infra-production svc/postgres 9187:9187
 kubectl port-forward -n infra-production svc/rabbitmq 15692:15692
+kubectl port-forward -n infra-production svc/redis-master 9121:9121
 ```
 
 ---
@@ -344,6 +397,8 @@ kubectl port-forward -n infra-production svc/rabbitmq 15692:15692
 | **Can't connect to postgres** | Check namespace: must connect from within cluster |
 | **Database doesn't exist** | Create it first (see Initial Setup above) |
 | **RabbitMQ access denied** | Create vhost and set permissions |
+| **Redis WRONGPASS error** | Verify `redis_password` matches secret in your app namespace |
+| **Redis key collisions** | Ensure all apps use namespaced key prefixes (`env:app:...`) |
 | **Typesense 401 error** | Check API key matches infrastructure config |
 | **DNS resolution fails** | Ensure full FQDN: `*.infra-production.svc.cluster.local` |
 

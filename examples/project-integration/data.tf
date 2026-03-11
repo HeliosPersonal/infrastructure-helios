@@ -41,7 +41,13 @@ locals {
   typesense_url  = data.terraform_remote_state.infra.outputs.typesense_url
   typesense_host = data.terraform_remote_state.infra.outputs.typesense_host
   typesense_port = data.terraform_remote_state.infra.outputs.typesense_port
-  
+
+  # Redis - Shared instance (same host for all environments)
+  # Applications namespace their keys: staging:<appname>:<key>, production:<appname>:<key>
+  redis_host              = data.terraform_remote_state.infra.outputs.redis_host
+  redis_port              = data.terraform_remote_state.infra.outputs.redis_port
+  redis_connection_string = data.terraform_remote_state.infra.outputs.redis_connection_string
+
   # Keycloak
   keycloak_internal_url = data.terraform_remote_state.infra.outputs.keycloak_internal_url
   keycloak_external_url = data.terraform_remote_state.infra.outputs.keycloak_external_url
