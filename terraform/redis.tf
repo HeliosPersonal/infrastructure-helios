@@ -78,6 +78,7 @@ resource "helm_release" "redis" {
 # monitoring memory, and managing Redis connections.
 # Accessible at https://redisinsight.<base_domain>
 # On first launch, add a connection:
+#   Name:     Helios
 #   Host:     redis.infra-production.svc.cluster.local
 #   Port:     6379
 #   Password: (from redis_password secret)
