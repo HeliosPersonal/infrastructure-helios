@@ -123,8 +123,13 @@ output "redis_port" {
 
 output "redis_connection_string" {
   value       = "redis://redis.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local:6379"
-  description = "Redis connection string template (no password — read from secret)"
+  description = "Redis connection string template for StackExchange.Redis (no password — append ,password=<pwd>,abortConnect=false in consuming projects)"
   sensitive   = false
+}
+
+output "redis_insight_url" {
+  value       = var.redis_insight_enabled ? "https://redisinsight.${var.base_domain}" : ""
+  description = "Redis Insight UI URL (browser-based GUI for managing Redis)"
 }
 
 # ====================================================================================

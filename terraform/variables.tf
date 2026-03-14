@@ -195,6 +195,12 @@ variable "redis_storage_class" {
   description = "Storage class for Redis persistent volume"
 }
 
+variable "redis_insight_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable Redis Insight UI deployment (accessible at redisinsight.<base_domain>)"
+}
+
 # ====================================================================================
 # OLLAMA LLM SERVICE CONFIGURATION
 # ====================================================================================

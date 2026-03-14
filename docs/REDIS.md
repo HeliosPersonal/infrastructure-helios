@@ -25,6 +25,32 @@ apps-production  → redis.infra-production:6379  (prefix: production:<app>:)
 
 ---
 
+## Redis Insight
+
+**Redis Insight** is a browser-based GUI deployed alongside Redis in the `infra-production` namespace. It lets you browse keys, run commands, monitor memory usage, and manage streams/pub-sub.
+
+| | |
+|---|---|
+| **URL** | `https://redisinsight.<base_domain>` (see `redis_insight_url` Terraform output) |
+| **Terraform output** | `redis_insight_url` |
+| **Enable/disable** | `redis_insight_enabled = true` (default) in `terraform.tfvars` |
+
+### First-time connection setup
+
+When you open Redis Insight for the first time you need to add the Redis connection manually:
+
+1. Click **"Add Redis Database"**
+2. Fill in:
+   - **Host**: `redis.infra-production.svc.cluster.local`
+   - **Port**: `6379`
+   - **Password**: value of `redis_password` from `terraform.secret.tfvars`
+   - **Name**: `infra-production` (or any label you like)
+3. Click **"Test Connection"**, then **"Add Redis Database"**
+
+> Connection details are persisted in a `256Mi` PVC (`redis-insight-data`) so they survive pod restarts.
+
+---
+
 ## Environment Variable Contract
 
 Every application that uses Redis **must** accept these environment variables:

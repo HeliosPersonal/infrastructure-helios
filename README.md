@@ -21,6 +21,7 @@ This repository provides reusable infrastructure components managed by Terraform
 | **PostgreSQL** | Relational database (Bitnami Helm) | Single shared instance |
 | **RabbitMQ** | Message broker (AMQP) | Single shared instance |
 | **Redis** | In-memory cache & session store (Bitnami Helm) | Single shared instance |
+| **Redis Insight** | Browser-based GUI for Redis management | Single shared instance |
 | **Typesense** | Fast search engine with Dashboard UI | Single shared instance |
 | **Keycloak** | Identity & Access Management (OAuth2/OIDC) | Production |
 | **Ollama** | Local LLM inference service | Staging |
@@ -195,6 +196,7 @@ locals {
 | **PostgreSQL** | `postgres_host`, `postgres_port`, `postgres_connection_string` (shared instance) |
 | **RabbitMQ** | `rabbitmq_host`, `rabbitmq_amqp_port`, `rabbitmq_management_port`, `rabbitmq_connection_string` (shared instance) |
 | **Redis** | `redis_host`, `redis_port`, `redis_connection_string` (shared instance) |
+| **Redis Insight** | `redis_insight_url` |
 | **Typesense** | `typesense_host`, `typesense_port`, `typesense_url` (shared instance) |
 | **Keycloak** | `keycloak_internal_url`, `keycloak_external_url`, `keycloak_admin_user` |
 | **Monitoring** | `otlp_grpc_endpoint`, `otlp_http_endpoint` |
@@ -327,6 +329,7 @@ kubectl port-forward -n infra-production svc/typesense 8108:8108
 http://rabbit.helios           # RabbitMQ Management
 http://typesense.helios         # Typesense Dashboard
 http://typesense-api.helios     # Typesense API
+https://redisinsight.your-domain.com  # Redis Insight
 ```
 
 ---
