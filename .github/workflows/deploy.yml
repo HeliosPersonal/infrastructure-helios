@@ -38,6 +38,7 @@ env:
   TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   TF_VAR_pg_password: ${{ secrets.PG_PASSWORD }}
   TF_VAR_rabbit_password: ${{ secrets.RABBIT_PASSWORD }}
+  TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
   TF_VAR_typesense_api_key: ${{ secrets.TYPESENSE_API_KEY }}
   TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
   TF_VAR_keycloak_postgres_password: ${{ secrets.KEYCLOAK_POSTGRES_PASSWORD }}
@@ -98,11 +99,31 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
+      - name: Import Existing Helm Releases
+        run: |
+          # Import any Helm releases that exist in the cluster but not in Terraform state.
+          # This prevents "cannot re-use a name that is still in use" errors on first-run
+          # or after state loss. Failures are silenced: already-managed or missing releases
+          # are both safe to ignore.
+          terraform import 'helm_release.ollama_production[0]' infra-production/ollama 2>/dev/null || true
+
       - name: Terraform Validate
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan -no-color | tee plan.txt
+        run: |
+          set -e
+          PLAN_OUTPUT=$(terraform plan -out=tfplan -no-color 2>&1) && echo "$PLAN_OUTPUT" | tee plan.txt || {
+            LOCK_ID=$(echo "$PLAN_OUTPUT" | grep -o 'ID:.*' | head -1 | awk '{print $2}')
+            if [ -n "$LOCK_ID" ]; then
+              echo "State is locked (ID: $LOCK_ID) — forcing unlock and retrying..."
+              terraform force-unlock -force "$LOCK_ID"
+              terraform plan -out=tfplan -no-color | tee plan.txt
+            else
+              echo "$PLAN_OUTPUT"
+              exit 1
+            fi
+          }
 
       - name: Upload Plan Artifact
         if: always()

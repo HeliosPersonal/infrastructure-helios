@@ -14,6 +14,7 @@ locals {
   rabbitmq_host            = "rabbit.${var.base_domain}"
   typesense_dashboard_host = "typesense.${var.base_domain}"
   typesense_api_host       = "typesense-api.${var.base_domain}"
+  redis_insight_host       = "redisinsight.${var.base_domain}"
 }
 
 ############################
@@ -240,3 +241,50 @@ resource "kubernetes_ingress_v1" "typesense_api" {
 
   depends_on = [kubernetes_namespace.infra_production, kubernetes_stateful_set.typesense, helm_release.ingress_nginx, kubernetes_secret_v1.cloudflare_origin]
 }
+
+# Redis Insight UI
+resource "kubernetes_ingress_v1" "redis_insight" {
+  count = var.redis_insight_enabled ? 1 : 0
+
+  metadata {
+    name      = "redis-insight"
+    namespace = kubernetes_namespace.infra_production.metadata[0].name
+    annotations = {
+      # Increase proxy timeouts for long-running Redis commands in the browser
+      "nginx.ingress.kubernetes.io/proxy-read-timeout" = "3600"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout" = "3600"
+    }
+  }
+
+  spec {
+    ingress_class_name = "nginx"
+
+    tls {
+      secret_name = kubernetes_secret_v1.cloudflare_origin.metadata[0].name
+      hosts       = [local.redis_insight_host]
+    }
+
+    rule {
+      host = local.redis_insight_host
+
+      http {
+        path {
+          path      = "/"
+          path_type = "Prefix"
+
+          backend {
+            service {
+              name = "redis-insight"
+              port {
+                number = 5540
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [kubernetes_deployment.redis_insight, helm_release.ingress_nginx, kubernetes_secret_v1.cloudflare_origin]
+}
+

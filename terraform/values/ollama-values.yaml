@@ -35,7 +35,7 @@ env:
 initModels:
   enabled: true
   models:
-    - phi3.5:mini
+    - qwen2.5:3b
 
 livenessProbe:
   enabled: true

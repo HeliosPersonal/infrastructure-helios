@@ -35,7 +35,7 @@ keycloak_admin_user = "admin"
 ollama_enabled            = true
 ollama_helm_chart_version = "0.30.0"
 ollama_image_tag          = "latest"
-ollama_default_model      = "phi3.5:mini"
+ollama_default_model      = "qwen2.5:3b"
 ollama_storage_size       = "20Gi"
 ollama_memory_request     = "2Gi"
 ollama_memory_limit       = "8Gi"
@@ -56,6 +56,9 @@ ollama_cpu_limit          = "4000m"
 # RabbitMQ Passwords
 # rabbit_staging_password    = "your-staging-rabbitmq-password"
 # rabbit_production_password = "your-production-rabbitmq-password"
+
+# Redis
+# redis_password = "your-redis-password"
 
 # Typesense API Keys
 # typesense_staging_api_key    = "your-staging-typesense-key"

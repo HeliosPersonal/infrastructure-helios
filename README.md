@@ -7,7 +7,7 @@ This repository provides reusable infrastructure components managed by Terraform
 
 ## 🏗️ Architecture Philosophy
 
-**Single Instance, Multi-Tenant:** All infrastructure services (PostgreSQL, RabbitMQ, Typesense) run as single shared instances. Applications create their own databases, vhosts, and collections within these instances for staging/production isolation. This approach:
+**Single Instance, Multi-Tenant:** All infrastructure services (PostgreSQL, RabbitMQ, Redis, Typesense) run as single shared instances. Applications create their own databases, vhosts, key namespaces, and collections within these instances for staging/production isolation. This approach:
 
 - ✅ Reduces resource consumption (1 PostgreSQL vs 2)
 - ✅ Simplifies maintenance and backups
@@ -20,6 +20,8 @@ This repository provides reusable infrastructure components managed by Terraform
 |-----------|-------------|----------|
 | **PostgreSQL** | Relational database (Bitnami Helm) | Single shared instance |
 | **RabbitMQ** | Message broker (AMQP) | Single shared instance |
+| **Redis** | In-memory cache & session store (Bitnami Helm) | Single shared instance |
+| **Redis Insight** | Browser-based GUI for Redis management | Single shared instance |
 | **Typesense** | Fast search engine with Dashboard UI | Single shared instance |
 | **Keycloak** | Identity & Access Management (OAuth2/OIDC) | Production |
 | **Ollama** | Local LLM inference service | Staging |
@@ -33,12 +35,14 @@ This repository provides reusable infrastructure components managed by Terraform
 ```
 Internet → Cloudflare (DNS/WAF/SSL) → Home Router → K3s Cluster
                                                       ├─ NGINX Ingress
-                                                      ├─ infra-production (PostgreSQL, RabbitMQ, Typesense, Keycloak)
+                                                      ├─ infra-production (PostgreSQL, RabbitMQ, Redis, Typesense, Keycloak)
                                                       │   └─ Applications connect and create:
                                                       │      ├─ staging_myapp (database)
                                                       │      ├─ production_myapp (database)
                                                       │      ├─ staging_vhost (RabbitMQ)
                                                       │      ├─ production_vhost (RabbitMQ)
+                                                      │      ├─ staging:myapp:* (Redis keys)
+                                                      │      ├─ production:myapp:* (Redis keys)
                                                       │      ├─ staging_* (Typesense collections)
                                                       │      └─ production_* (Typesense collections)
                                                       ├─ apps-staging (Your staging applications + Ollama)
@@ -91,6 +95,7 @@ cloudflare_api_token           = "your-cloudflare-token"
 # Shared Infrastructure
 pg_password                    = "secure-password"        # Single PostgreSQL instance
 rabbit_password                = "secure-password"        # Single RabbitMQ instance
+redis_password                 = "secure-password"        # Single Redis instance
 typesense_api_key              = "secure-key"             # Single Typesense instance
 
 # Keycloak
@@ -170,6 +175,7 @@ data "terraform_remote_state" "infra" {
 locals {
   postgres_host     = data.terraform_remote_state.infra.outputs.postgres_host
   rabbitmq_host     = data.terraform_remote_state.infra.outputs.rabbitmq_host
+  redis_host        = data.terraform_remote_state.infra.outputs.redis_host
   typesense_url     = data.terraform_remote_state.infra.outputs.typesense_url
   keycloak_url      = data.terraform_remote_state.infra.outputs.keycloak_external_url
   base_domain       = data.terraform_remote_state.infra.outputs.base_domain
@@ -189,6 +195,8 @@ locals {
 | **Namespaces** | `namespace_infra_production`, `namespace_apps_staging`, `namespace_apps_production` |
 | **PostgreSQL** | `postgres_host`, `postgres_port`, `postgres_connection_string` (shared instance) |
 | **RabbitMQ** | `rabbitmq_host`, `rabbitmq_amqp_port`, `rabbitmq_management_port`, `rabbitmq_connection_string` (shared instance) |
+| **Redis** | `redis_host`, `redis_port`, `redis_connection_string` (shared instance) |
+| **Redis Insight** | `redis_insight_url` |
 | **Typesense** | `typesense_host`, `typesense_port`, `typesense_url` (shared instance) |
 | **Keycloak** | `keycloak_internal_url`, `keycloak_external_url`, `keycloak_admin_user` |
 | **Monitoring** | `otlp_grpc_endpoint`, `otlp_http_endpoint` |
@@ -212,6 +220,7 @@ infrastructure-helios/
 │   ├── namespaces.tf         # K8s namespaces
 │   ├── postgres.tf           # Shared PostgreSQL instance
 │   ├── rabbitmq.tf           # Shared RabbitMQ instance
+│   ├── redis.tf              # Shared Redis instance
 │   ├── keycloak.tf           # Identity management
 │   ├── typesense.tf          # Shared Typesense instance
 │   ├── ollama.tf             # LLM service
@@ -313,12 +322,14 @@ kubectl get certificates -A
 # Port-forward to shared services
 kubectl port-forward -n infra-production svc/postgres 5432:5432
 kubectl port-forward -n infra-production svc/rabbitmq 15672:15672  # Management UI
+kubectl port-forward -n infra-production svc/redis-master 6379:6379
 kubectl port-forward -n infra-production svc/typesense 8108:8108
 
 # Access management UIs (internal domain)
 http://rabbit.helios           # RabbitMQ Management
 http://typesense.helios         # Typesense Dashboard
 http://typesense-api.helios     # Typesense API
+https://redisinsight.your-domain.com  # Redis Insight
 ```
 
 ---
@@ -330,6 +341,7 @@ http://typesense-api.helios     # Typesense API
 | [docs/AZURE_TFSTATE_BACKEND.md](docs/AZURE_TFSTATE_BACKEND.md) | Azure infrastructure for Terraform state storage — what was created, why, and how it works |
 | [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | All GitHub Actions secrets and variables required for CI/CD |
 | [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Connection strings and endpoints for all shared infrastructure services |
+| [docs/REDIS.md](docs/REDIS.md) | Redis setup details, key naming conventions, consuming from other projects, and troubleshooting |
 
 ---
 

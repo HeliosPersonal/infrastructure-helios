@@ -32,5 +32,11 @@ resource "helm_release" "rabbitmq" {
     name  = "persistence.size"
     value = var.rabbit_persistence_size
   }
+
+  # Enable shovel plugin for moving/forwarding messages between brokers or queues
+  set {
+    name  = "extraPlugins"
+    value = "rabbitmq_shovel rabbitmq_shovel_management"
+  }
 }
 

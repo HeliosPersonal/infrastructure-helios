@@ -174,6 +174,34 @@ variable "grafana_cloud_tempo_user" {
 }
 
 # ====================================================================================
+# REDIS CONFIGURATION
+# ====================================================================================
+
+variable "redis_password" {
+  type        = string
+  sensitive   = true
+  description = "Redis password for shared instance (applications use key prefixes for isolation)"
+}
+
+variable "redis_storage_size" {
+  type        = string
+  default     = "4Gi"
+  description = "Persistent volume size for Redis AOF/RDB snapshots"
+}
+
+variable "redis_storage_class" {
+  type        = string
+  default     = "local-path"
+  description = "Storage class for Redis persistent volume"
+}
+
+variable "redis_insight_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable Redis Insight UI deployment (accessible at redisinsight.<base_domain>)"
+}
+
+# ====================================================================================
 # OLLAMA LLM SERVICE CONFIGURATION
 # ====================================================================================
 
@@ -192,13 +220,13 @@ variable "ollama_helm_chart_version" {
 variable "ollama_image_tag" {
   type        = string
   description = "Ollama Docker image tag"
-  default     = "latest"
+  default     = "0.17.7"
 }
 
 variable "ollama_default_model" {
   type        = string
   description = "Default LLM model to download on initialization"
-  default     = "phi3.5:mini"
+  default     = "qwen2.5:3b"
 }
 
 variable "ollama_storage_size" {

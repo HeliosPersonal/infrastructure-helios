@@ -108,12 +108,37 @@ output "keycloak_admin_user" {
 }
 
 # ====================================================================================
+# REDIS OUTPUTS
+# ====================================================================================
+
+output "redis_host" {
+  value       = "redis.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local"
+  description = "Redis shared instance hostname (applications use key prefixes for isolation)"
+}
+
+output "redis_port" {
+  value       = 6379
+  description = "Redis port"
+}
+
+output "redis_connection_string" {
+  value       = "redis://redis.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local:6379"
+  description = "Redis connection string template for StackExchange.Redis (no password — append ,password=<pwd>,abortConnect=false in consuming projects)"
+  sensitive   = false
+}
+
+output "redis_insight_url" {
+  value       = var.redis_insight_enabled ? "https://redisinsight.${var.base_domain}" : ""
+  description = "Redis Insight UI URL (browser-based GUI for managing Redis)"
+}
+
+# ====================================================================================
 # OLLAMA OUTPUTS
 # ====================================================================================
 
-output "ollama_staging_url" {
-  value       = var.ollama_enabled ? "http://ollama.${kubernetes_namespace.apps_staging.metadata[0].name}.svc.cluster.local:11434" : ""
-  description = "Ollama staging internal URL"
+output "ollama_url" {
+  value       = var.ollama_enabled ? "http://ollama.${kubernetes_namespace.infra_production.metadata[0].name}.svc.cluster.local:11434" : ""
+  description = "Ollama internal URL"
 }
 
 # ====================================================================================

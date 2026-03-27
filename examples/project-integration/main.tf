@@ -65,7 +65,12 @@ resource "kubernetes_config_map" "app_config" {
     # Shared Typesense - use collection prefixes
     TYPESENSE_URL            = local.typesense_url
     TYPESENSE_COLLECTION_PREFIX = "staging_overflow_"  # e.g., staging_overflow_questions
-    
+
+    # Shared Redis - use key prefixes for isolation
+    REDIS_HOST   = local.redis_host
+    REDIS_PORT   = tostring(local.redis_port)
+    REDIS_PREFIX = "staging:overflow:"  # e.g., staging:overflow:session:<id>
+
     # Keycloak
     KEYCLOAK_URL      = local.keycloak_external_url
     KEYCLOAK_INTERNAL = local.keycloak_internal_url
