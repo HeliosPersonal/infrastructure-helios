@@ -95,6 +95,17 @@ Encode with: `base64 -w 0 terraform/certs/origin.crt`
 | `GRAFANA_CLOUD_TEMPO_URL` | Tempo OTLP endpoint |
 | `GRAFANA_CLOUD_TEMPO_USER` | Tempo instance ID |
 
+### Headlamp (K8s Dashboard)
+
+| Secret | Description |
+|---|---|
+| `HEADLAMP_OIDC_CLIENT_SECRET` | Keycloak OIDC client secret for Headlamp SSO (from Keycloak → client → Credentials tab). **Required**. |
+
+> **Token login still works** even when OIDC is enabled:
+> ```bash
+> kubectl get secret headlamp-token -n monitoring -o jsonpath='{.data.token}' | base64 -d
+> ```
+
 ---
 
 ## Azure Infrastructure Setup (one-time, already done)

@@ -15,6 +15,7 @@ locals {
   typesense_dashboard_host = "typesense.${var.base_domain}"
   typesense_api_host       = "typesense-api.${var.base_domain}"
   redis_insight_host       = "redisinsight.${var.base_domain}"
+  headlamp_host            = "k8s.${var.base_domain}"
 }
 
 ############################

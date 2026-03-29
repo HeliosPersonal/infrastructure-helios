@@ -52,6 +52,7 @@ env:
   TF_VAR_base_domain: ${{ secrets.BASE_DOMAIN }}
   TF_VAR_internal_domain: ${{ secrets.INTERNAL_DOMAIN }}
   TF_VAR_keycloak_subdomain: ${{ secrets.KEYCLOAK_SUBDOMAIN }}
+  TF_VAR_headlamp_oidc_client_secret: ${{ secrets.HEADLAMP_OIDC_CLIENT_SECRET }}
 
 jobs:
   # ------------------------------------------------------------

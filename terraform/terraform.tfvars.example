@@ -13,7 +13,7 @@
 base_domain        = "example.com"
 internal_domain    = "helios"
 keycloak_subdomain = "keycloak"
-ddns_subdomains    = ["www", "staging", "keycloak"]
+ddns_subdomains    = ["www", "staging", "keycloak", "k8s"]
 
 
 # PostgreSQL
@@ -42,6 +42,15 @@ ollama_memory_limit       = "8Gi"
 ollama_cpu_request        = "500m"
 ollama_cpu_limit          = "4000m"
 
+# Headlamp (K8s Dashboard)
+headlamp_enabled            = true
+headlamp_helm_chart_version = "0.41.0"
+
+# Headlamp OIDC (Keycloak SSO)
+headlamp_oidc_realm     = "master"
+headlamp_oidc_client_id = "headlamp"
+headlamp_oidc_scopes    = "openid profile email groups"
+
 # ====================================================================================
 # terraform.secret.tfvars (DO NOT commit to git!)
 # ====================================================================================
@@ -68,6 +77,9 @@ ollama_cpu_limit          = "4000m"
 # keycloak_admin_password    = "your-keycloak-admin-password"
 # keycloak_postgres_password = "your-keycloak-db-password"
 
+# Headlamp OIDC client secret (from Keycloak client credentials tab)
+# headlamp_oidc_client_secret = "your-headlamp-oidc-client-secret"
+
 # Grafana Cloud (get these from your Grafana Cloud dashboard)
 # grafana_cloud_api_token       = "your-grafana-cloud-token"
 # grafana_cloud_prometheus_url  = "https://prometheus-prod-XX-XX.grafana.net"
@@ -76,4 +88,5 @@ ollama_cpu_limit          = "4000m"
 # grafana_cloud_loki_user       = "123456"
 # grafana_cloud_tempo_url       = "https://tempo-prod-XX.grafana.net:443"
 # grafana_cloud_tempo_user      = "123456"
+
 

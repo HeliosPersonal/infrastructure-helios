@@ -44,7 +44,7 @@ variable "keycloak_subdomain" {
 
 variable "ddns_subdomains" {
   type        = list(string)
-  default     = ["www", "staging", "keycloak"]
+  default     = ["www", "staging", "keycloak", "k8s"]
   description = "List of subdomains to configure DDNS for"
 }
 
@@ -257,5 +257,71 @@ variable "ollama_cpu_limit" {
   type        = string
   description = "CPU limit for Ollama pod"
   default     = "4000m"
+}
+
+# ====================================================================================
+# HEADLAMP (K8S DASHBOARD) CONFIGURATION
+# ====================================================================================
+
+variable "headlamp_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable Headlamp Kubernetes dashboard deployment (accessible at k8s.<base_domain>)"
+}
+
+variable "headlamp_helm_chart_version" {
+  type        = string
+  description = "Headlamp Helm chart version"
+  default     = "0.41.0"
+}
+
+
+variable "headlamp_memory_request" {
+  type        = string
+  description = "Memory request for Headlamp pod"
+  default     = "128Mi"
+}
+
+variable "headlamp_memory_limit" {
+  type        = string
+  description = "Memory limit for Headlamp pod"
+  default     = "256Mi"
+}
+
+variable "headlamp_cpu_request" {
+  type        = string
+  description = "CPU request for Headlamp pod"
+  default     = "100m"
+}
+
+variable "headlamp_cpu_limit" {
+  type        = string
+  description = "CPU limit for Headlamp pod"
+  default     = "500m"
+}
+
+
+variable "headlamp_oidc_realm" {
+  type        = string
+  default     = "master"
+  description = "Keycloak realm name for Headlamp OIDC (e.g., master)"
+}
+
+variable "headlamp_oidc_client_id" {
+  type        = string
+  default     = "headlamp"
+  description = "Keycloak OIDC client ID for Headlamp"
+}
+
+variable "headlamp_oidc_client_secret" {
+  type        = string
+  sensitive   = true
+  description = "Keycloak OIDC client secret for Headlamp (from Keycloak client credentials)"
+}
+
+variable "headlamp_oidc_scopes" {
+  type        = string
+  default     = "openid,profile,email"
+  description = "Comma-separated OIDC scopes requested from Keycloak"
 }
 
