@@ -110,11 +110,12 @@ resource "kubernetes_secret" "headlamp_oidc" {
   }
 
   data = {
-    OIDC_CLIENT_ID     = var.headlamp_oidc_client_id
-    OIDC_CLIENT_SECRET = var.headlamp_oidc_client_secret
-    OIDC_ISSUER_URL    = "https://${local.keycloak_hostname}/realms/${var.headlamp_oidc_realm}"
-    OIDC_SCOPES        = var.headlamp_oidc_scopes
-    OIDC_CALLBACK_URL  = "https://${local.headlamp_host}/oidc-callback"
+    OIDC_CLIENT_ID        = var.headlamp_oidc_client_id
+    OIDC_CLIENT_SECRET    = var.headlamp_oidc_client_secret
+    OIDC_ISSUER_URL       = "https://${local.keycloak_hostname}/realms/${var.headlamp_oidc_realm}"
+    OIDC_SCOPES           = var.headlamp_oidc_scopes
+    OIDC_CALLBACK_URL     = "https://${local.headlamp_host}/oidc-callback"
+    OIDC_USE_ACCESS_TOKEN = "true"
   }
 
   depends_on = [kubernetes_namespace.monitoring]
@@ -153,6 +154,7 @@ resource "local_file" "headlamp_values" {
           enabled: true
           name: headlamp-oidc
         useCookie: true
+        useAccessToken: true
         callbackURL: "https://${local.headlamp_host}/oidc-callback"
   EOT
 }
