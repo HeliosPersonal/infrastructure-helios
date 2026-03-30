@@ -321,7 +321,7 @@ variable "headlamp_oidc_client_secret" {
 
 variable "headlamp_oidc_scopes" {
   type        = string
-  default     = "openid,profile,email"
-  description = "Comma-separated OIDC scopes requested from Keycloak"
+  default     = "profile,email"
+  description = "Comma-separated OIDC scopes for Headlamp (openid is always added automatically)"
 }
 

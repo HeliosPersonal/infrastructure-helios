@@ -49,7 +49,7 @@ headlamp_helm_chart_version = "0.41.0"
 # Headlamp OIDC (Keycloak SSO)
 headlamp_oidc_realm     = "master"
 headlamp_oidc_client_id = "headlamp"
-headlamp_oidc_scopes    = "openid profile email groups"
+headlamp_oidc_scopes    = "profile,email"
 
 # ====================================================================================
 # terraform.secret.tfvars (DO NOT commit to git!)
