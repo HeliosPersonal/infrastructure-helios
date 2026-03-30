@@ -3,8 +3,17 @@
 # Configure k3s API server for Keycloak OIDC authentication
 # Run this on the k3s server node as root
 #
-# This enables the K8s API server to validate OIDC tokens from Keycloak,
-# which is required for Headlamp OIDC login to work.
+# ⚠️  IMPORTANT: If Keycloak runs INSIDE the k3s cluster, the API server
+# cannot reach the OIDC issuer URL during startup (chicken-and-egg problem).
+# In that case you must either:
+#   a) Use --oidc-issuer-url pointing to a URL reachable BEFORE the cluster
+#      is fully up (e.g., the node's IP + NodePort, or a load balancer), OR
+#   b) Skip k3s OIDC config entirely and let Headlamp proxy K8s API calls
+#      using its own ServiceAccount token (the default behavior).
+#
+# k3s config locations:
+#   /etc/rancher/k3s/config.yaml  — server config (flags)
+#   /etc/rancher/k3s/k3s.yaml     — kubeconfig (NOT what we edit)
 #
 # After running this script, restart k3s:
 #   sudo systemctl restart k3s
@@ -16,8 +25,23 @@ KEYCLOAK_URL="${1:-https://keycloak.devoverflow.org}"
 REALM="${2:-master}"
 CLIENT_ID="${3:-headlamp}"
 
+# k3s server config — NOT the kubeconfig (k3s.yaml)
 CONFIG_FILE="/etc/rancher/k3s/config.yaml"
 
+echo "⚠️  WARNING: If Keycloak runs INSIDE this k3s cluster, adding OIDC"
+echo "   flags will prevent the API server from starting (it can't reach"
+echo "   the issuer URL before the cluster is up)."
+echo ""
+echo "   Only proceed if Keycloak is reachable EXTERNALLY (outside the cluster)."
+echo ""
+read -p "Continue? (y/N) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
+fi
+
+echo ""
 echo "Configuring k3s OIDC for:"
 echo "  Issuer URL: ${KEYCLOAK_URL}/realms/${REALM}"
 echo "  Client ID:  ${CLIENT_ID}"
@@ -57,4 +81,9 @@ echo "OIDC configuration added to $CONFIG_FILE"
 echo ""
 echo "Restart k3s to apply:"
 echo "  sudo systemctl restart k3s"
+echo ""
+echo "To revert if something breaks:"
+echo "  sudo cp ${CONFIG_FILE}.bak.* ${CONFIG_FILE}"
+echo "  sudo systemctl restart k3s"
+
 

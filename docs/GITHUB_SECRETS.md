@@ -103,7 +103,11 @@ Encode with: `base64 -w 0 terraform/certs/origin.crt`
 
 > **Token login still works** even when OIDC is enabled:
 > ```bash
+> # Linux / macOS
 > kubectl get secret headlamp-token -n monitoring -o jsonpath='{.data.token}' | base64 -d
+>
+> # Windows (PowerShell)
+> kubectl get secret headlamp-token -n monitoring -o jsonpath='{.data.token}' | ForEach-Object { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
 > ```
 
 ---
