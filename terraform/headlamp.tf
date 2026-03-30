@@ -96,31 +96,6 @@ resource "kubernetes_secret" "headlamp_token" {
   depends_on = [kubernetes_service_account.headlamp]
 }
 
-# OIDC secret for Headlamp – stores Keycloak client credentials
-# Referenced by the Helm chart via config.oidc.externalSecret (envFrom secretRef)
-resource "kubernetes_secret" "headlamp_oidc" {
-  count = var.headlamp_enabled ? 1 : 0
-
-  metadata {
-    name      = "headlamp-oidc"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
-    labels = {
-      app = "headlamp"
-    }
-  }
-
-  data = {
-    OIDC_CLIENT_ID        = var.headlamp_oidc_client_id
-    OIDC_CLIENT_SECRET    = var.headlamp_oidc_client_secret
-    OIDC_ISSUER_URL       = "https://${local.keycloak_hostname}/realms/${var.headlamp_oidc_realm}"
-    OIDC_SCOPES           = var.headlamp_oidc_scopes
-    OIDC_CALLBACK_URL     = "https://${local.headlamp_host}/oidc-callback"
-    OIDC_USE_ACCESS_TOKEN = "true"
-  }
-
-  depends_on = [kubernetes_namespace.monitoring]
-}
-
 # Create Helm values file for Headlamp
 resource "local_file" "headlamp_values" {
   count    = var.headlamp_enabled ? 1 : 0
@@ -149,12 +124,14 @@ resource "local_file" "headlamp_values" {
     config:
       oidc:
         secret:
-          create: false
-        externalSecret:
-          enabled: true
+          create: true
           name: headlamp-oidc
-        useAccessToken: true
+        clientID: "${var.headlamp_oidc_client_id}"
+        clientSecret: "${var.headlamp_oidc_client_secret}"
+        issuerURL: "https://${local.keycloak_hostname}/realms/${var.headlamp_oidc_realm}"
+        scopes: "${var.headlamp_oidc_scopes}"
         callbackURL: "https://${local.headlamp_host}/oidc-callback"
+        useAccessToken: true
   EOT
 }
 
@@ -185,7 +162,6 @@ resource "helm_release" "headlamp" {
     kubernetes_namespace.monitoring,
     kubernetes_cluster_role_binding.headlamp,
     kubernetes_secret.headlamp_token,
-    kubernetes_secret.headlamp_oidc,
   ]
 }
 
