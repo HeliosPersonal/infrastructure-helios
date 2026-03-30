@@ -7,12 +7,16 @@
 #   kubectl get secret headlamp-token -n monitoring -o jsonpath='{.data.token}' | base64 -d
 #
 # Login (OIDC / Keycloak):
-#   1. Import keycloak-headlamp-realm-import.json via Keycloak Admin →
-#      master realm → Realm settings → Action → Partial import
-#      (creates the "headlamp" client + "headlamp-admins" group)
-#   2. Copy the client secret (Clients → headlamp → Credentials) into the
-#      HEADLAMP_OIDC_CLIENT_SECRET GitHub/Infisical secret
-#   3. Add users to the "headlamp-admins" group to grant access
+#   Prerequisites:
+#     - k3s API server must be configured with OIDC flags:
+#       Run: scripts/configure-k3s-oidc.sh && sudo systemctl restart k3s
+#   Setup:
+#     1. Import keycloak-headlamp-realm-import.json via Keycloak Admin →
+#        master realm → Realm settings → Action → Partial import
+#        (creates the "headlamp" client + "headlamp-admins" group)
+#     2. Copy the client secret (Clients → headlamp → Credentials) into the
+#        HEADLAMP_OIDC_CLIENT_SECRET GitHub/Infisical secret
+#     3. Add users to the "headlamp-admins" group to grant access
 # ============================================================================
 
 
@@ -96,6 +100,32 @@ resource "kubernetes_secret" "headlamp_token" {
   depends_on = [kubernetes_service_account.headlamp]
 }
 
+# ClusterRoleBinding for OIDC users in the headlamp-admins Keycloak group
+# Maps the "headlamp-admins" group claim to cluster-admin so OIDC-authenticated
+# users can access K8s resources through Headlamp
+resource "kubernetes_cluster_role_binding" "headlamp_oidc_admins" {
+  count = var.headlamp_enabled ? 1 : 0
+
+  metadata {
+    name = "headlamp-oidc-admins"
+    labels = {
+      app = "headlamp"
+    }
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "cluster-admin"
+  }
+
+  subject {
+    kind      = "Group"
+    name      = "headlamp-admins"
+    api_group = "rbac.authorization.k8s.io"
+  }
+}
+
 # Create Helm values file for Headlamp
 resource "local_file" "headlamp_values" {
   count    = var.headlamp_enabled ? 1 : 0
@@ -113,6 +143,9 @@ resource "local_file" "headlamp_values" {
     serviceAccount:
       create: false
       name: ${kubernetes_service_account.headlamp[0].metadata[0].name}
+
+    clusterRoleBinding:
+      create: false
 
     resources:
       requests:
@@ -193,12 +226,10 @@ resource "kubernetes_ingress_v1" "headlamp" {
     name      = "headlamp"
     namespace = kubernetes_namespace.monitoring.metadata[0].name
     annotations = {
-      "nginx.ingress.kubernetes.io/proxy-body-size"       = "8m"
-      "nginx.ingress.kubernetes.io/proxy-read-timeout"    = "3600"
-      "nginx.ingress.kubernetes.io/proxy-send-timeout"    = "3600"
-      "nginx.ingress.kubernetes.io/proxy-buffer-size"     = "32k"
-      "nginx.ingress.kubernetes.io/proxy-buffers-number"  = "8"
-      "nginx.ingress.kubernetes.io/large-client-header-buffers" = "4 32k"
+      "nginx.ingress.kubernetes.io/proxy-body-size"    = "8m"
+      "nginx.ingress.kubernetes.io/proxy-read-timeout" = "3600"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout" = "3600"
+      "nginx.ingress.kubernetes.io/proxy-buffer-size"  = "32k"
     }
   }
 
