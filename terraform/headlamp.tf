@@ -153,7 +153,6 @@ resource "local_file" "headlamp_values" {
         externalSecret:
           enabled: true
           name: headlamp-oidc
-        useCookie: true
         useAccessToken: true
         callbackURL: "https://${local.headlamp_host}/oidc-callback"
   EOT
@@ -218,10 +217,12 @@ resource "kubernetes_ingress_v1" "headlamp" {
     name      = "headlamp"
     namespace = kubernetes_namespace.monitoring.metadata[0].name
     annotations = {
-      "nginx.ingress.kubernetes.io/proxy-body-size"    = "8m"
-      "nginx.ingress.kubernetes.io/proxy-read-timeout" = "3600"
-      "nginx.ingress.kubernetes.io/proxy-send-timeout" = "3600"
-      "nginx.ingress.kubernetes.io/proxy-buffer-size"  = "16k"
+      "nginx.ingress.kubernetes.io/proxy-body-size"       = "8m"
+      "nginx.ingress.kubernetes.io/proxy-read-timeout"    = "3600"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout"    = "3600"
+      "nginx.ingress.kubernetes.io/proxy-buffer-size"     = "32k"
+      "nginx.ingress.kubernetes.io/proxy-buffers-number"  = "8"
+      "nginx.ingress.kubernetes.io/large-client-header-buffers" = "4 32k"
     }
   }
 
