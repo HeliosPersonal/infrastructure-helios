@@ -3,7 +3,7 @@
     {
       "clientId": "headlamp",
       "name": "Headlamp K8s Dashboard",
-      "description": "OIDC client for Headlamp Kubernetes Dashboard (k8s.devoverflow.org)",
+      "description": "OIDC client for Headlamp Kubernetes Dashboard — update URLs below to match your base_domain",
       "rootUrl": "https://k8s.devoverflow.org",
       "baseUrl": "/",
       "adminUrl": "https://k8s.devoverflow.org",

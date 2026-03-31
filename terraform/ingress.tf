@@ -1,28 +1,29 @@
-# ========================================
+# ====================================================================================
 # INGRESS CONFIGURATION
-# ========================================
+# ====================================================================================
 # This file manages:
 # 1. NGINX Ingress Controller installation
-# 2. Infrastructure service ingress rules (RabbitMQ, Typesense, Keycloak)
+# 2. Infrastructure service ingress rules (RabbitMQ, Typesense, Keycloak, Redis Insight, Headlamp)
 #
 # Application service ingresses are managed separately in project repos
 # via Kustomize or project-specific Terraform.
-# ========================================
+# ====================================================================================
 
 locals {
-  keycloak_host            = "${var.keycloak_subdomain}.${var.base_domain}"
-  rabbitmq_host            = "rabbit.${var.base_domain}"
-  typesense_dashboard_host = "typesense.${var.base_domain}"
-  typesense_api_host       = "typesense-api.${var.base_domain}"
-  redis_insight_host       = "redisinsight.${var.base_domain}"
-  headlamp_host            = "k8s.${var.base_domain}"
+  keycloak_host              = "${var.keycloak_subdomain}.${var.base_domain}"
+  rabbitmq_management_host   = "rabbit.${var.base_domain}"
+  typesense_dashboard_host   = "typesense.${var.base_domain}"
+  typesense_api_host         = "typesense-api.${var.base_domain}"
+  redis_insight_host         = "redisinsight.${var.base_domain}"
+  headlamp_host              = "k8s.${var.base_domain}"
 }
 
-############################
+# ------------------------------------------------------------------------------------
 # INGRESS CONTROLLER
-############################
+# ------------------------------------------------------------------------------------
 # Deploys NGINX Ingress Controller to handle all ingress traffic.
 # This is a cluster-wide component that routes external traffic to services.
+# ------------------------------------------------------------------------------------
 
 resource "helm_release" "ingress_nginx" {
   name             = "ingress-nginx"
@@ -59,11 +60,12 @@ resource "kubernetes_secret_v1" "cloudflare_origin" {
   depends_on = [kubernetes_namespace.infra_production]
 }
 
-############################
+# ------------------------------------------------------------------------------------
 # KEYCLOAK INGRESS (GLOBAL)
-############################
+# ------------------------------------------------------------------------------------
 # Exposes Keycloak authentication service for the entire cluster.
 # Used by both staging and production environments.
+# ------------------------------------------------------------------------------------
 
 resource "kubernetes_ingress_v1" "keycloak_global" {
   depends_on = [kubernetes_namespace.infra_production, helm_release.ingress_nginx, helm_release.keycloak, kubernetes_secret_v1.cloudflare_origin]
@@ -115,10 +117,11 @@ resource "kubernetes_ingress_v1" "keycloak_global" {
   }
 }
 
-############################
+# ------------------------------------------------------------------------------------
 # INFRASTRUCTURE INGRESSES
-############################
+# ------------------------------------------------------------------------------------
 # Exposes management UIs and APIs for shared infrastructure services
+# ------------------------------------------------------------------------------------
 
 # RabbitMQ Management UI
 resource "kubernetes_ingress_v1" "rabbitmq" {
@@ -132,11 +135,11 @@ resource "kubernetes_ingress_v1" "rabbitmq" {
 
     tls {
       secret_name = kubernetes_secret_v1.cloudflare_origin.metadata[0].name
-      hosts       = [local.rabbitmq_host]
+      hosts       = [local.rabbitmq_management_host]
     }
 
     rule {
-      host = local.rabbitmq_host
+      host = local.rabbitmq_management_host
 
       http {
         path {

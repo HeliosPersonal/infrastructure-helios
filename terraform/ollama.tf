@@ -1,7 +1,9 @@
-# ============================================================================
-# Ollama LLM Service - Helm Chart Deployment
-# Provides local LLM inference for services
-# ============================================================================
+# ====================================================================================
+# OLLAMA LLM SERVICE
+# ====================================================================================
+# Deploys Ollama for local LLM inference via Helm chart
+# Provides AI/ML capabilities for applications in the cluster
+# ====================================================================================
 
 # Create Helm values file for Ollama
 resource "local_file" "ollama_values" {
@@ -82,7 +84,6 @@ resource "local_file" "ollama_values" {
       failureThreshold: 6
   EOT
 }
-
 
 # Deploy Ollama using Helm
 resource "helm_release" "ollama_production" {

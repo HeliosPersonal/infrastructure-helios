@@ -15,18 +15,20 @@ internal_domain    = "helios"
 keycloak_subdomain = "keycloak"
 ddns_subdomains    = ["www", "staging", "keycloak", "k8s"]
 
+# PostgreSQL (shared instance)
+pg_storage_size  = "20Gi"
+pg_storage_class = "local-path"
 
-# PostgreSQL
-pg_staging_database    = "stagingdb"
-pg_production_database = "productiondb"
-pg_storage_size        = "10Gi"
-pg_storage_class       = "local-path"
+# RabbitMQ (shared instance)
+rabbit_persistence_size = "8Gi"
 
-# RabbitMQ
-rabbit_persistence_size = "5Gi"
+# Redis (shared instance)
+redis_storage_size  = "4Gi"
+redis_storage_class = "local-path"
+redis_insight_enabled = true
 
-# Typesense
-typesense_storage_size = "5Gi"
+# Typesense (shared instance)
+typesense_storage_size = "15Gi"
 
 # Keycloak
 keycloak_admin_user = "admin"
@@ -34,7 +36,7 @@ keycloak_admin_user = "admin"
 # Ollama
 ollama_enabled            = true
 ollama_helm_chart_version = "0.30.0"
-ollama_image_tag          = "latest"
+ollama_image_tag          = "0.17.7"
 ollama_default_model      = "qwen2.5:3b"
 ollama_storage_size       = "20Gi"
 ollama_memory_request     = "2Gi"
@@ -49,7 +51,7 @@ headlamp_helm_chart_version = "0.41.0"
 # Headlamp OIDC (Keycloak SSO)
 headlamp_oidc_realm     = "master"
 headlamp_oidc_client_id = "headlamp"
-headlamp_oidc_scopes    = "profile,email"
+headlamp_oidc_scopes    = "openid,profile,email,groups"
 
 # ====================================================================================
 # terraform.secret.tfvars (DO NOT commit to git!)
@@ -58,20 +60,11 @@ headlamp_oidc_scopes    = "profile,email"
 # Cloudflare
 # cloudflare_api_token = "your-cloudflare-api-token"
 
-# PostgreSQL Passwords
-# pg_staging_password    = "your-staging-db-password"
-# pg_production_password = "your-production-db-password"
-
-# RabbitMQ Passwords
-# rabbit_staging_password    = "your-staging-rabbitmq-password"
-# rabbit_production_password = "your-production-rabbitmq-password"
-
-# Redis
-# redis_password = "your-redis-password"
-
-# Typesense API Keys
-# typesense_staging_api_key    = "your-staging-typesense-key"
-# typesense_production_api_key = "your-production-typesense-key"
+# Shared Infrastructure Passwords
+# pg_password       = "your-postgres-password"
+# rabbit_password   = "your-rabbitmq-password"
+# redis_password    = "your-redis-password"
+# typesense_api_key = "your-typesense-api-key"
 
 # Keycloak
 # keycloak_admin_password    = "your-keycloak-admin-password"
@@ -88,5 +81,3 @@ headlamp_oidc_scopes    = "profile,email"
 # grafana_cloud_loki_user       = "123456"
 # grafana_cloud_tempo_url       = "https://tempo-prod-XX.grafana.net:443"
 # grafana_cloud_tempo_user      = "123456"
-
-

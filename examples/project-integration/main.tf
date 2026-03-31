@@ -8,10 +8,12 @@
 terraform {
   required_version = ">= 1.5"
 
-  backend "kubernetes" {
-    secret_suffix = "overflow"  # Project-specific state
-    namespace     = "kube-system"
-    config_path   = "~/.kube/config"
+  backend "azurerm" {
+    resource_group_name  = "rg-helios-tfstate"
+    storage_account_name = "stheliosinfrastate"
+    container_name       = "tfstate"
+    key                  = "overflow.tfstate"
+    use_azuread_auth     = true
   }
 
   required_providers {
@@ -78,22 +80,22 @@ resource "kubernetes_config_map" "app_config" {
     # Monitoring
     OTLP_ENDPOINT     = local.otlp_grpc_endpoint
     
-    # Ollama (staging only)
-    OLLAMA_URL        = local.ollama_staging_url
+    # Ollama
+    OLLAMA_URL        = local.ollama_url
   }
 }
 
 # ====================================================================================
 # EXAMPLE: Project-specific ingress using shared domain
 # ====================================================================================
+# TLS is terminated by Cloudflare; the origin certificate secret must be created
+# in each namespace that needs TLS ingress (see cloudflare-origin secret in infra).
+# ====================================================================================
 
 resource "kubernetes_ingress_v1" "overflow_staging" {
   metadata {
     name      = "overflow-staging"
     namespace = local.namespace_apps_staging
-    annotations = {
-      "cert-manager.io/cluster-issuer" = "letsencrypt-production"
-    }
   }
 
   spec {
@@ -101,7 +103,7 @@ resource "kubernetes_ingress_v1" "overflow_staging" {
 
     tls {
       hosts       = ["staging.${local.base_domain}"]
-      secret_name = "overflow-staging-tls"
+      secret_name = "cloudflare-origin"
     }
 
     rule {

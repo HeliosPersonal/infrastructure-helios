@@ -4,11 +4,6 @@
 # Deploys Keycloak authentication server for user management and SSO
 # Includes embedded PostgreSQL database for Keycloak data storage
 # ====================================================================================
-
-locals {
-  keycloak_hostname = "${var.keycloak_subdomain}.${var.base_domain}"
-}
-
 # Keycloak authentication server for production environment
 # Provides OAuth2/OIDC authentication, user management, and SSO capabilities
 resource "helm_release" "keycloak" {
@@ -67,7 +62,7 @@ resource "helm_release" "keycloak" {
   # Public hostname configuration
   set {
     name  = "keycloak.hostname"
-    value = local.keycloak_hostname
+    value = local.keycloak_host
   }
 
   # Disable strict hostname checking for flexible resolution
@@ -82,4 +77,3 @@ resource "helm_release" "keycloak" {
     value = "xforwarded"
   }
 }
-

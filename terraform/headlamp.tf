@@ -1,7 +1,8 @@
-# ============================================================================
-# Headlamp - Kubernetes Dashboard
+# ====================================================================================
+# HEADLAMP - Kubernetes Dashboard
+# ====================================================================================
 # Provides a web-based UI for monitoring and managing the K8s cluster
-# Accessible at k8s.devoverflow.org
+# Accessible at k8s.<base_domain>
 #
 # Login (token):
 #   kubectl get secret headlamp-token -n monitoring -o jsonpath='{.data.token}' | base64 -d
@@ -17,8 +18,7 @@
 #     2. Copy the client secret (Clients → headlamp → Credentials) into the
 #        HEADLAMP_OIDC_CLIENT_SECRET GitHub/Infisical secret
 #     3. Add users to the "headlamp-admins" group to grant access
-# ============================================================================
-
+# ====================================================================================
 
 # ClusterRole for Headlamp - read-only access to all resources
 resource "kubernetes_cluster_role" "headlamp" {
@@ -161,7 +161,7 @@ resource "local_file" "headlamp_values" {
           name: headlamp-oidc
         clientID: "${var.headlamp_oidc_client_id}"
         clientSecret: "${var.headlamp_oidc_client_secret}"
-        issuerURL: "https://${local.keycloak_hostname}/realms/${var.headlamp_oidc_realm}"
+        issuerURL: "https://${local.keycloak_host}/realms/${var.headlamp_oidc_realm}"
         scopes: "${var.headlamp_oidc_scopes}"
         callbackURL: "https://${local.headlamp_host}/oidc-callback"
         useAccessToken: true
@@ -188,8 +188,6 @@ resource "helm_release" "headlamp" {
   values = [
     local_file.headlamp_values[0].content
   ]
-
-
   depends_on = [
     local_file.headlamp_values,
     kubernetes_namespace.monitoring,
@@ -218,7 +216,7 @@ resource "kubernetes_secret_v1" "cloudflare_origin_monitoring" {
   depends_on = [kubernetes_namespace.monitoring]
 }
 
-# Ingress for Headlamp - accessible at k8s.devoverflow.org
+# Ingress for Headlamp - accessible at k8s.<base_domain>
 resource "kubernetes_ingress_v1" "headlamp" {
   count = var.headlamp_enabled ? 1 : 0
 
@@ -265,4 +263,3 @@ resource "kubernetes_ingress_v1" "headlamp" {
 
   depends_on = [helm_release.headlamp, helm_release.ingress_nginx, kubernetes_secret_v1.cloudflare_origin_monitoring]
 }
-

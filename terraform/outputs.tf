@@ -168,4 +168,3 @@ output "internal_domain" {
   value       = var.internal_domain
   description = "Internal domain suffix for local network"
 }
-

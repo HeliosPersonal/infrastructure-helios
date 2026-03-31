@@ -52,9 +52,9 @@ amqp://admin:PASSWORD@rabbitmq.infra-production.svc.cluster.local:5672/staging
 http://rabbit.helios:15672
 ```
 
- ### Redis (Shared Instance)
+### Redis (Shared Instance)
 ```yaml
-Host: redis-master.infra-production.svc.cluster.local
+Host: redis.infra-production.svc.cluster.local
 Port: 6379
 Password: <from infrastructure terraform.secret.tfvars>
 Key Namespace: <you define your own prefix>
@@ -68,7 +68,7 @@ production:<appname>:<purpose>:<id>    # e.g., production:myapp:cache:user:42
 
 **Connection String Template:**
 ```
-redis://:PASSWORD@redis-master.infra-production.svc.cluster.local:6379/0
+redis://:PASSWORD@redis.infra-production.svc.cluster.local:6379/0
 ```
 
 ---
@@ -131,7 +131,7 @@ resource "kubernetes_job" "create_database" {
           name    = "psql"
           image   = "postgres:16"
           command = ["psql", "-h", var.postgres_host, "-U", "postgres", 
-                     "-c", "CREATE DATABASE IF NOT EXISTS staging_myapp;"]
+                     "-c", "SELECT 'CREATE DATABASE staging_myapp' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'staging_myapp')\\gexec"]
           env {
             name = "PGPASSWORD"
             value_from {
@@ -155,13 +155,14 @@ initContainers:
   - name: create-database
     image: postgres:16
     command:
-      - psql
-      - -h
-      - postgres.infra-production.svc.cluster.local
-      - -U
-      - postgres
+      - sh
       - -c
-      - CREATE DATABASE IF NOT EXISTS staging_myapp;
+      - |
+        psql -h postgres.infra-production.svc.cluster.local -U postgres \
+          -tc "SELECT 1 FROM pg_database WHERE datname = 'staging_myapp'" \
+          | grep -q 1 || \
+        psql -h postgres.infra-production.svc.cluster.local -U postgres \
+          -c "CREATE DATABASE staging_myapp;"
     env:
       - name: PGPASSWORD
         valueFrom:
@@ -199,7 +200,7 @@ Redis requires no server-side setup — just agree on a key prefix in your app c
 
 **In your application (environment variables):**
 ```bash
-REDIS_HOST=redis-master.infra-production.svc.cluster.local
+REDIS_HOST=redis.infra-production.svc.cluster.local
 REDIS_PORT=6379
 REDIS_KEY_PREFIX=staging:myapp:       # e.g. staging:myapp: or production:myapp:
 ```
@@ -207,7 +208,7 @@ REDIS_KEY_PREFIX=staging:myapp:       # e.g. staging:myapp: or production:myapp:
 **Verify connectivity:**
 ```bash
 kubectl run -it --rm redis-test --image=redis:7 --restart=Never -- \
-  redis-cli -h redis-master.infra-production.svc.cluster.local -a PASSWORD PING
+  redis-cli -h redis.infra-production.svc.cluster.local -a PASSWORD PING
 ```
 
 ### 4. Create Typesense Collections
@@ -243,11 +244,13 @@ await client.collections().create({
 ```hcl
 # data.tf
 data "terraform_remote_state" "infra" {
-  backend = "kubernetes"
+  backend = "azurerm"
   config = {
-    secret_suffix = "infrastructure-helios"
-    namespace     = "kube-system"
-    config_path   = "~/.kube/config"
+    resource_group_name  = "rg-helios-tfstate"
+    storage_account_name = "stheliosinfrastate"
+    container_name       = "tfstate"
+    key                  = "infrastructure-helios.tfstate"
+    use_azuread_auth     = true
   }
 }
 
@@ -262,11 +265,11 @@ locals {
   redis_port        = data.terraform_remote_state.infra.outputs.redis_port
   typesense_url     = data.terraform_remote_state.infra.outputs.typesense_url
   keycloak_url      = data.terraform_remote_state.infra.outputs.keycloak_external_url
-  
+
   # Namespaces
   namespace_staging = data.terraform_remote_state.infra.outputs.namespace_apps_staging
   namespace_prod    = data.terraform_remote_state.infra.outputs.namespace_apps_production
-  
+
   # Environment-specific database names
   db_name_staging = "staging_${var.app_name}"
   db_name_prod    = "production_${var.app_name}"
@@ -275,24 +278,36 @@ locals {
 # deployment.tf
 resource "kubernetes_deployment" "app_staging" {
   # ... metadata ...
-  
+
   spec {
     template {
       spec {
         container {
+          # ... other config ...
+
           env {
-            - name: POSTGRES_HOST
-              value: local.postgres_host
-            - name: POSTGRES_PORT
-              value: tostring(local.postgres_port)
-            - name: POSTGRES_DATABASE
-              value: local.db_name_staging
-            - name: RABBITMQ_HOST
-              value: local.rabbitmq_host
-            - name: RABBITMQ_VHOST
-              value: "staging"
-            - name: TYPESENSE_URL
-              value: local.typesense_url
+            name  = "POSTGRES_HOST"
+            value = local.postgres_host
+          }
+          env {
+            name  = "POSTGRES_PORT"
+            value = tostring(local.postgres_port)
+          }
+          env {
+            name  = "POSTGRES_DATABASE"
+            value = local.db_name_staging
+          }
+          env {
+            name  = "RABBITMQ_HOST"
+            value = local.rabbitmq_host
+          }
+          env {
+            name  = "RABBITMQ_VHOST"
+            value = "staging"
+          }
+          env {
+            name  = "TYPESENSE_URL"
+            value = local.typesense_url
           }
         }
       }
@@ -359,7 +374,7 @@ kubectl run -it --rm rabbitmq-test --image=rabbitmq:management --restart=Never -
 
 # Test Redis
 kubectl run -it --rm redis-test --image=redis:7 --restart=Never -- \
-  redis-cli -h redis-master.infra-production.svc.cluster.local -a PASSWORD PING
+  redis-cli -h redis.infra-production.svc.cluster.local -a PASSWORD PING
 
 # Test Typesense
 kubectl run -it --rm curl-test --image=curlimages/curl --restart=Never -- \
@@ -380,12 +395,12 @@ http://postgres.infra-production.svc.cluster.local:9187/metrics
 http://rabbitmq.infra-production.svc.cluster.local:15692/metrics
 
 # Redis metrics (redis-exporter sidecar)
-http://redis-master.infra-production.svc.cluster.local:9121/metrics
+http://redis.infra-production.svc.cluster.local:9121/metrics
 
 # Check via port-forward
 kubectl port-forward -n infra-production svc/postgres 9187:9187
 kubectl port-forward -n infra-production svc/rabbitmq 15692:15692
-kubectl port-forward -n infra-production svc/redis-master 9121:9121
+kubectl port-forward -n infra-production svc/redis 9121:9121
 ```
 
 ---

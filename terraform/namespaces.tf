@@ -39,7 +39,6 @@ resource "kubernetes_namespace" "apps_production" {
   }
 }
 
-
 # Ingress controller namespace for managing external access to services
 resource "kubernetes_namespace" "ingress" {
   metadata {
@@ -64,4 +63,3 @@ resource "kubernetes_namespace" "monitoring" {
     }
   }
 }
-

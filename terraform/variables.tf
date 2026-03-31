@@ -58,7 +58,6 @@ variable "cloudflare_api_token" {
   description = "Cloudflare API token for DDNS updates"
 }
 
-
 # ====================================================================================
 # POSTGRESQL CONFIGURATION
 # ====================================================================================
@@ -118,19 +117,22 @@ variable "typesense_storage_size" {
 # ====================================================================================
 
 variable "keycloak_admin_user" {
-  type    = string
-  default = "admin"
+  type        = string
+  default     = "admin"
+  description = "Keycloak admin username"
 }
 
 variable "keycloak_admin_password" {
-  type      = string
-  sensitive = true
+  type        = string
+  sensitive   = true
+  description = "Keycloak admin password"
 }
 
 variable "keycloak_postgres_password" {
-  type      = string
-  sensitive = true
-  default   = "postgres"
+  type        = string
+  sensitive   = true
+  default     = "postgres"
+  description = "Password for Keycloak's embedded PostgreSQL database"
 }
 
 # ====================================================================================
@@ -274,8 +276,6 @@ variable "headlamp_helm_chart_version" {
   description = "Headlamp Helm chart version"
   default     = "0.41.0"
 }
-
-
 variable "headlamp_memory_request" {
   type        = string
   description = "Memory request for Headlamp pod"
@@ -299,8 +299,6 @@ variable "headlamp_cpu_limit" {
   description = "CPU limit for Headlamp pod"
   default     = "500m"
 }
-
-
 variable "headlamp_oidc_realm" {
   type        = string
   default     = "master"
@@ -324,4 +322,3 @@ variable "headlamp_oidc_scopes" {
   default     = "openid,profile,email,groups"
   description = "Comma-separated OIDC scopes for Headlamp"
 }
-
