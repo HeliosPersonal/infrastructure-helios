@@ -616,7 +616,7 @@ curl http://localhost:9121/metrics
 |----------|-------|
 | Chart | `cloudpirates/redis` |
 | Source | `oci://registry-1.docker.io/cloudpirates` |
-| Version | `0.26.4` |
+| Version | `0.26.8` |
 | Architecture | `standalone` — single master, no replica |
 | Namespace | `infra-production` |
 | Service | `redis` |

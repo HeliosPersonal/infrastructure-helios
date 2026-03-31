@@ -11,7 +11,7 @@ resource "local_file" "ollama_values" {
   filename = "${path.module}/values/ollama-values.yaml"
   content  = <<-EOT
     # Ollama Helm Chart Values
-    # Managed by Terraform
+    # Managed by Terraform — chart v1.54.0+
 
     image:
       repository: ollama/ollama
@@ -21,8 +21,6 @@ resource "local_file" "ollama_values" {
     service:
       type: ClusterIP
       port: 11434
-      targetPort: 11434
-      name: ollama-svc
 
     resources:
       requests:
@@ -43,16 +41,8 @@ resource "local_file" "ollama_values" {
     ollama:
       # Pull model on container startup (persisted, so only downloads once)
       models:
-        - ${var.ollama_default_model}
-
-    # Override command to filter health-check probe noise from logs.
-    # Kubernetes liveness/readiness probes hit GET "/" every few seconds;
-    # GIN always logs them. We pipe stderr+stdout through grep to drop those lines.
-    command:
-      - /bin/sh
-      - -c
-      - |
-        /bin/ollama serve 2>&1 | grep -Ev --line-buffered 'GET[[:space:]]+"/"'
+        pull:
+          - ${var.ollama_default_model}
 
     # Environment variables
     extraEnv:
@@ -65,9 +55,7 @@ resource "local_file" "ollama_values" {
 
     livenessProbe:
       enabled: true
-      httpGet:
-        path: /
-        port: 11434
+      path: /
       initialDelaySeconds: 60
       periodSeconds: 10
       timeoutSeconds: 5
@@ -75,9 +63,7 @@ resource "local_file" "ollama_values" {
 
     readinessProbe:
       enabled: true
-      httpGet:
-        path: /
-        port: 11434
+      path: /
       initialDelaySeconds: 30
       periodSeconds: 5
       timeoutSeconds: 3

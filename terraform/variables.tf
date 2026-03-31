@@ -216,13 +216,13 @@ variable "ollama_enabled" {
 variable "ollama_helm_chart_version" {
   type        = string
   description = "Ollama Helm chart version"
-  default     = "0.30.0"
+  default     = "1.54.0"
 }
 
 variable "ollama_image_tag" {
   type        = string
   description = "Ollama Docker image tag"
-  default     = "0.17.7"
+  default     = "0.19.0"
 }
 
 variable "ollama_default_model" {

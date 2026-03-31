@@ -13,7 +13,7 @@ resource "helm_release" "redis" {
   namespace        = kubernetes_namespace.infra_production.metadata[0].name
   repository       = "oci://registry-1.docker.io/cloudpirates"
   chart            = "redis"
-  version          = "0.26.4"
+  version          = "0.26.8"
   create_namespace = false
 
   depends_on = [kubernetes_namespace.infra_production]
@@ -115,7 +115,7 @@ resource "kubernetes_deployment" "redis_insight" {
       spec {
         container {
           name  = "redis-insight"
-          image = "redis/redisinsight:2.68"
+          image = "redis/redisinsight:3.2"
 
           port {
             container_port = 5540

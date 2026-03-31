@@ -71,7 +71,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Kubeconfig
         run: |
@@ -128,7 +128,7 @@ jobs:
 
       - name: Upload Plan Artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tfplan-${{ github.run_id }}
           path: |
@@ -152,7 +152,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Kubeconfig
         run: |
@@ -175,7 +175,7 @@ jobs:
         run: terraform init
 
       - name: Download Plan Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: tfplan-${{ github.run_id }}
           path: terraform/
@@ -198,7 +198,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Kubeconfig
         run: |

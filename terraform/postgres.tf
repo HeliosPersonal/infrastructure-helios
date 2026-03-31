@@ -13,7 +13,7 @@ resource "helm_release" "postgres" {
   namespace        = kubernetes_namespace.infra_production.metadata[0].name
   repository       = "oci://registry-1.docker.io/bitnamicharts"
   chart            = "postgresql"
-  version          = "18.1.13"
+  version          = "18.5.14"
   create_namespace = false
 
   depends_on = [kubernetes_namespace.infra_production]

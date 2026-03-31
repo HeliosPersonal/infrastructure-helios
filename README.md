@@ -212,6 +212,8 @@ locals {
 
 ```
 infrastructure-helios/
+├── .github/workflows/
+│   └── deploy.yml            # CI/CD: plan on push, apply with environment approval
 ├── terraform/
 │   ├── provider.tf           # Providers + Azure Blob state backend
 │   ├── variables.tf          # All configurable variables
@@ -249,11 +251,25 @@ infrastructure-helios/
 
 ## Deployment
 
+### CI/CD (GitHub Actions)
+
+Deployment is managed via `.github/workflows/deploy.yml`:
+
+- **Push to `main`** → `plan` runs automatically, `apply` waits for manual approval
+- **Pull Requests** → `plan` only
+- **Manual dispatch** → `plan` or `destroy` (with approval)
+
+Apply and Destroy are gated by the **`production` GitHub Environment** — requires your approval before executing.
+
+**Setup**: See [`docs/GITHUB_SECRETS.md`](docs/GITHUB_SECRETS.md) for all required secrets.
+
+### Manual (Local)
+
 ```bash
 cd terraform
 
 # ARM_* env vars must be set for Azure backend authentication
-# (e.g., via shell profile or CI environment variables)
+# (see docs/AZURE_TFSTATE_BACKEND.md for details)
 
 # Initialize (connects to Azure Blob state backend)
 terraform init
@@ -351,7 +367,7 @@ https://redisinsight.your-domain.com  # Redis Insight
 | Document | Description |
 |---|---|
 | [docs/AZURE_TFSTATE_BACKEND.md](docs/AZURE_TFSTATE_BACKEND.md) | Azure infrastructure for Terraform state storage — what was created, why, and how it works |
-| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | All secrets and variables required for deployment (managed via Infisical) |
+| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | All GitHub Actions secrets and variables required for CI/CD |
 | [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Connection strings and endpoints for all shared infrastructure services |
 | [docs/REDIS.md](docs/REDIS.md) | Redis setup details, key naming conventions, consuming from other projects, and troubleshooting |
 

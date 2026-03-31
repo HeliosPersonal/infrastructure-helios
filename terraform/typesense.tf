@@ -36,7 +36,7 @@ resource "kubernetes_stateful_set" "typesense" {
       spec {
         container {
           name  = "typesense"
-          image = "typesense/typesense:27.1"
+          image = "typesense/typesense:30.1"
 
           env {
             name  = "TYPESENSE_DATA_DIR"

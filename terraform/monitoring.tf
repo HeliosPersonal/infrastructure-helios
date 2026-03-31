@@ -15,7 +15,7 @@ resource "helm_release" "kube_state_metrics" {
   namespace  = kubernetes_namespace.monitoring.metadata[0].name
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-state-metrics"
-  version    = "5.16.0"
+  version    = "7.2.2"
 
   set {
     name  = "prometheus.monitor.enabled"
@@ -57,7 +57,7 @@ resource "helm_release" "node_exporter" {
   namespace  = kubernetes_namespace.monitoring.metadata[0].name
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "prometheus-node-exporter"
-  version    = "4.24.0"
+  version    = "4.52.2"
 
   depends_on = [helm_release.kube_state_metrics]
 
@@ -141,7 +141,7 @@ resource "helm_release" "grafana_alloy" {
   namespace  = kubernetes_namespace.monitoring.metadata[0].name
   repository = "https://grafana.github.io/helm-charts"
   chart      = "alloy"
-  version    = "0.9.2"
+  version    = "1.6.2"
 
   depends_on = [
     kubernetes_secret.grafana_cloud_credentials,

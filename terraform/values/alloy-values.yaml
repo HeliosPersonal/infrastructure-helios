@@ -324,7 +324,6 @@ alloy:
         forward_to = [loki.write.grafanacloud.receiver]
       }
       // ── End pod log tailing ──────────────────────────────────────────────────
-  
 
   extraPorts:
     - name: "otlp-grpc"
@@ -336,20 +335,20 @@ alloy:
       targetPort: 4318
       protocol: "TCP"
 
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 controller:
   type: "deployment"
   replicas: 1
 
 service:
   type: ClusterIP
-
-resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 128Mi
 
 rbac:
   create: true

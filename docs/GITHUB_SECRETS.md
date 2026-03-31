@@ -1,4 +1,4 @@
-# Secrets Configuration
+# GitHub Secrets Configuration
 
 All secrets are managed in **Infisical** and synced automatically to GitHub Actions secrets.
 
