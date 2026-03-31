@@ -230,6 +230,7 @@ resource "kubernetes_ingress_v1" "headlamp" {
       "nginx.ingress.kubernetes.io/proxy-read-timeout" = "3600"
       "nginx.ingress.kubernetes.io/proxy-send-timeout" = "3600"
       "nginx.ingress.kubernetes.io/proxy-buffer-size"  = "32k"
+      "nginx.ingress.kubernetes.io/proxy-buffers"      = "4 32k"
     }
   }
 
