@@ -70,7 +70,7 @@ variable "pg_password" {
 
 variable "pg_storage_size" {
   type        = string
-  default     = "20Gi"
+  default     = "100Gi"
   description = "Persistent volume size for PostgreSQL (increased for shared instance)"
 }
 
@@ -92,7 +92,7 @@ variable "rabbit_password" {
 
 variable "rabbit_persistence_size" {
   type        = string
-  default     = "8Gi"
+  default     = "30Gi"
   description = "Persistent volume size for RabbitMQ (increased for shared instance)"
 }
 
@@ -108,7 +108,7 @@ variable "typesense_api_key" {
 
 variable "typesense_storage_size" {
   type        = string
-  default     = "15Gi"
+  default     = "50Gi"
   description = "Persistent volume size for Typesense (increased for shared instance)"
 }
 
@@ -187,7 +187,7 @@ variable "redis_password" {
 
 variable "redis_storage_size" {
   type        = string
-  default     = "4Gi"
+  default     = "15Gi"
   description = "Persistent volume size for Redis AOF/RDB snapshots"
 }
 
@@ -228,7 +228,7 @@ variable "ollama_image_tag" {
 variable "ollama_default_model" {
   type        = string
   description = "Default LLM model to download on initialization"
-  default     = "qwen2.5:3b"
+  default     = "qwen2.5:7b"
 }
 
 variable "ollama_storage_size" {
@@ -246,7 +246,7 @@ variable "ollama_memory_request" {
 variable "ollama_memory_limit" {
   type        = string
   description = "Memory limit for Ollama pod"
-  default     = "8Gi"
+  default     = "12Gi"
 }
 
 variable "ollama_cpu_request" {
@@ -274,7 +274,7 @@ variable "headlamp_enabled" {
 variable "headlamp_helm_chart_version" {
   type        = string
   description = "Headlamp Helm chart version"
-  default     = "0.41.0"
+  default     = "0.39.0"
 }
 variable "headlamp_memory_request" {
   type        = string
@@ -319,6 +319,6 @@ variable "headlamp_oidc_client_secret" {
 
 variable "headlamp_oidc_scopes" {
   type        = string
-  default     = "openid,profile,email,groups"
+  default     = "profile email"
   description = "Comma-separated OIDC scopes for Headlamp"
 }

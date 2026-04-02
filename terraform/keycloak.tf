@@ -76,4 +76,25 @@ resource "helm_release" "keycloak" {
     name  = "keycloak.proxyHeaders"
     value = "xforwarded"
   }
+
+  # Resource limits — Keycloak is a JVM app; give it enough heap headroom
+  set {
+    name  = "keycloak.resources.requests.memory"
+    value = "512Mi"
+  }
+
+  set {
+    name  = "keycloak.resources.requests.cpu"
+    value = "250m"
+  }
+
+  set {
+    name  = "keycloak.resources.limits.memory"
+    value = "1536Mi"
+  }
+
+  set {
+    name  = "keycloak.resources.limits.cpu"
+    value = "1000m"
+  }
 }

@@ -38,5 +38,26 @@ resource "helm_release" "rabbitmq" {
     name  = "extraPlugins"
     value = "rabbitmq_shovel rabbitmq_shovel_management"
   }
+
+  # Resource limits
+  set {
+    name  = "resources.requests.memory"
+    value = "128Mi"
+  }
+
+  set {
+    name  = "resources.requests.cpu"
+    value = "100m"
+  }
+
+  set {
+    name  = "resources.limits.memory"
+    value = "512Mi"
+  }
+
+  set {
+    name  = "resources.limits.cpu"
+    value = "500m"
+  }
 }
 

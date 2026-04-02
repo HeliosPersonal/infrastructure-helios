@@ -6,6 +6,7 @@
 #
 # Login (token):
 #   kubectl get secret headlamp-token -n monitoring -o jsonpath='{.data.token}' | base64 -d
+#   (token has full cluster-admin equivalent access via headlamp-cluster-admin ClusterRole)
 #
 # Login (OIDC / Keycloak):
 #   Prerequisites:
@@ -20,12 +21,12 @@
 #     3. Add users to the "headlamp-admins" group to grant access
 # ====================================================================================
 
-# ClusterRole for Headlamp - read-only access to all resources
+# ClusterRole for Headlamp - full admin access to all resources
 resource "kubernetes_cluster_role" "headlamp" {
   count = var.headlamp_enabled ? 1 : 0
 
   metadata {
-    name = "headlamp-cluster-reader"
+    name = "headlamp-cluster-admin"
     labels = {
       app = "headlamp"
     }
@@ -34,7 +35,7 @@ resource "kubernetes_cluster_role" "headlamp" {
   rule {
     api_groups = ["", "apps", "batch", "networking.k8s.io", "rbac.authorization.k8s.io", "storage.k8s.io", "policy", "autoscaling"]
     resources  = ["*"]
-    verbs      = ["get", "list", "watch"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
   }
 
   rule {
@@ -64,7 +65,7 @@ resource "kubernetes_cluster_role_binding" "headlamp" {
   count = var.headlamp_enabled ? 1 : 0
 
   metadata {
-    name = "headlamp-cluster-reader"
+    name = "headlamp-cluster-admin"
     labels = {
       app = "headlamp"
     }
@@ -178,7 +179,6 @@ resource "helm_release" "headlamp" {
   namespace  = kubernetes_namespace.monitoring.metadata[0].name
 
   cleanup_on_fail = true
-  replace         = true
   force_update    = true
 
   wait          = true

@@ -55,5 +55,26 @@ resource "helm_release" "postgres" {
     name  = "metrics.enabled"
     value = "true"
   }
+
+  # Resource limits — shared instance for all environments
+  set {
+    name  = "primary.resources.requests.memory"
+    value = "256Mi"
+  }
+
+  set {
+    name  = "primary.resources.requests.cpu"
+    value = "250m"
+  }
+
+  set {
+    name  = "primary.resources.limits.memory"
+    value = "1Gi"
+  }
+
+  set {
+    name  = "primary.resources.limits.cpu"
+    value = "1000m"
+  }
 }
 

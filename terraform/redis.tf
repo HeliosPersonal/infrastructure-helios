@@ -69,6 +69,27 @@ resource "helm_release" "redis" {
     name  = "metrics.serviceMonitor.enabled"
     value = "false"
   }
+
+  # Resource limits — Redis is lightweight but must be bounded on a shared node
+  set {
+    name  = "resources.requests.memory"
+    value = "64Mi"
+  }
+
+  set {
+    name  = "resources.requests.cpu"
+    value = "100m"
+  }
+
+  set {
+    name  = "resources.limits.memory"
+    value = "512Mi"
+  }
+
+  set {
+    name  = "resources.limits.cpu"
+    value = "300m"
+  }
 }
 
 # ====================================================================================

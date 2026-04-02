@@ -17,6 +17,7 @@
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "redirectUris": [
+        "https://k8s.devoverflow.org/oidc-callback",
         "https://k8s.devoverflow.org/*"
       ],
       "webOrigins": [
@@ -31,7 +32,8 @@
       "attributes": {
         "post.logout.redirect.uris": "https://k8s.devoverflow.org/*",
         "access.token.lifespan": "3600",
-        "use.refresh.tokens": "true"
+        "use.refresh.tokens": "true",
+        "oauth2.authorization.code.lifespan": "300"
       },
       "protocolMappers": [
         {

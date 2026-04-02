@@ -5,6 +5,36 @@
 # Provides AI/ML capabilities for applications in the cluster
 # ====================================================================================
 
+# PVC created by Terraform so it exists before Helm schedules the pod.
+# Using existingClaim in the Helm values avoids the "spec is immutable"
+# error that occurs when upgrading a chart that owns its own PVC.
+resource "kubernetes_persistent_volume_claim" "ollama" {
+  count = var.ollama_enabled ? 1 : 0
+
+  # local-path uses WaitForFirstConsumer binding — PVC stays Pending until the
+  # pod is scheduled. Setting wait_until_bound = false prevents Terraform from
+  # blocking here forever.
+  wait_until_bound = false
+
+  metadata {
+    name      = "ollama"
+    namespace = kubernetes_namespace.infra_production.metadata[0].name
+  }
+
+  spec {
+    access_modes       = ["ReadWriteOnce"]
+    storage_class_name = "local-path"
+
+    resources {
+      requests = {
+        storage = var.ollama_storage_size
+      }
+    }
+  }
+
+  depends_on = [kubernetes_namespace.infra_production]
+}
+
 # Create Helm values file for Ollama
 resource "local_file" "ollama_values" {
   count    = var.ollama_enabled ? 1 : 0
@@ -31,12 +61,11 @@ resource "local_file" "ollama_values" {
         cpu: ${var.ollama_cpu_limit}
 
     # Persistent storage so models survive pod restarts
+    # Uses the existing PVC created by the previous chart version.
+    # This avoids the "spec is immutable" error on upgrade.
     persistentVolume:
       enabled: true
-      size: ${var.ollama_storage_size}
-      storageClass: "local-path"
-      accessModes:
-        - ReadWriteOnce
+      existingClaim: "ollama"
 
     ollama:
       # Pull model on container startup (persisted, so only downloads once)
@@ -80,10 +109,7 @@ resource "helm_release" "ollama_production" {
   version    = var.ollama_helm_chart_version
   namespace  = kubernetes_namespace.infra_production.metadata[0].name
 
-  # Force recreation if values change significantly
-  recreate_pods   = true
   cleanup_on_fail = true
-  replace         = true
 
   # Force Helm to run upgrade on every apply to detect and fix drift
   # This ensures manually deleted resources get recreated
@@ -111,5 +137,6 @@ resource "helm_release" "ollama_production" {
   depends_on = [
     local_file.ollama_values,
     kubernetes_namespace.infra_production,
+    kubernetes_persistent_volume_claim.ollama,
   ]
 }
