@@ -1,185 +1,285 @@
-# Grafana Alloy Helm Chart Values
-# Managed by Terraform - variables are interpolated at apply time
+# ==============================================================================
+# GRAFANA ALLOY HELM VALUES
+# Managed by Terraform — variables (${var}) are interpolated at apply time.
+#
+# CONFIGURATION OVERVIEW
+# ──────────────────────
+# This file configures Grafana Alloy as the single observability agent.
+# The embedded River config is split into four numbered sections:
+#
+#   1. EXPORTERS      — Grafana Cloud destinations (metrics / traces / logs)
+#   2. OTLP PIPELINE  — receives push telemetry from application services
+#   3. INFRA METRICS  — scrapes Kubernetes and infrastructure metrics
+#   4. POD LOG TAILING — tails stdout logs from selected pods
+#
+# QUICK FILTERING REFERENCE
+# ─────────────────────────
+# Drop metrics by name         → add metric_relabel_rules to prometheus.scrape
+# Filter/sample OTLP traces    → insert otelcol.processor.filter or
+#                                otelcol.processor.probabilistic_sampler
+#                                between batch and the OTLP exporter (Section 2)
+# Filter OTLP logs             → insert otelcol.processor.filter before
+#                                otelcol.exporter.loki (Section 2)
+# Add a new scrape target      → add discovery.relabel + prometheus.scrape
+#                                block in Section 3
+# Tail logs from a new app     → extend the regex in discovery.relabel
+#                                "pod_logs" in Section 4
+# Change log-level detection   → edit stage.regex blocks in loki.process
+#                                "pod_logs" in Section 4
+# ==============================================================================
 
 alloy:
   configMap:
     content: |
-      // Prometheus Remote Write to Grafana Cloud
+      // ============================================================
+      // SECTION 1: EXPORTERS — Grafana Cloud destinations
+      // ============================================================
+      // These components define *where* each signal type is sent.
+      // All three services share the same API token.
+      // ============================================================
+
+      // ── Metrics → Grafana Cloud Prometheus ──────────────────────
       prometheus.remote_write "grafanacloud" {
         endpoint {
           url = "${prometheus_url}/api/prom/push"
-          
+
           basic_auth {
             username = "${prometheus_user}"
             password = "${grafana_cloud_api_token}"
           }
         }
       }
-      
-      // OTLP Receiver - For application services
-      otelcol.receiver.otlp "otlp_receiver" {
-        grpc {
-          endpoint = "0.0.0.0:4317"
-        }
-        
-        http {
-          endpoint = "0.0.0.0:4318"
-        }
-        
-        output {
-          metrics = [otelcol.processor.batch.default.input]
-          traces  = [otelcol.processor.batch.default.input]
-          logs    = [otelcol.processor.batch.default.input]
-        }
-      }
-      
-      // Batch processor for OTLP data
-      otelcol.processor.batch "default" {
-        output {
-          metrics = [otelcol.exporter.prometheus.default.input]
-          traces  = [otelcol.exporter.otlp.grafanacloud.input]
-          logs    = [otelcol.exporter.loki.grafanacloud.input]
-        }
-      }
-      
-      // Convert OTLP metrics to Prometheus format and forward directly
-      otelcol.exporter.prometheus "default" {
-        forward_to = [prometheus.remote_write.grafanacloud.receiver]
-      }
-      
-      // Basic auth for Grafana Cloud Tempo
+
+      // ── Traces → Grafana Cloud Tempo (OTLP/gRPC) ────────────────
       otelcol.auth.basic "grafanacloud" {
         username = "${tempo_user}"
         password = "${grafana_cloud_api_token}"
       }
-      
-      // Export traces to Grafana Cloud Tempo via OTLP
-      otelcol.exporter.otlp "grafanacloud" {
+
+      otelcol.exporter.otlp "tempo" {
         client {
           endpoint = "${tempo_url}"
           auth     = otelcol.auth.basic.grafanacloud.handler
         }
       }
-      
-      // Write logs to Grafana Cloud Loki
+
+      // ── Logs → Grafana Cloud Loki ────────────────────────────────
+      // Used by both the OTLP log exporter (Section 2) and the
+      // pod log tailing pipeline (Section 4).
       loki.write "grafanacloud" {
         endpoint {
           url = "${loki_url}/loki/api/v1/push"
-          
+
           basic_auth {
             username = "${loki_user}"
             password = "${grafana_cloud_api_token}"
           }
         }
       }
-      
-      // Export OTLP logs to Loki
+
+      // Bridge: converts OTLP log records to Loki format
       otelcol.exporter.loki "grafanacloud" {
         forward_to = [loki.write.grafanacloud.receiver]
       }
-      
-      // Self-scrape Alloy's own metrics
-      prometheus.exporter.self "alloy" { }
-      
-      prometheus.scrape "alloy" {
-        targets    = prometheus.exporter.self.alloy.targets
+
+
+      // ============================================================
+      // SECTION 2: OTLP PIPELINE — application push telemetry
+      // ============================================================
+      // Services push metrics, traces, and logs to Alloy via OTLP:
+      //   gRPC → grafana-alloy.monitoring.svc.cluster.local:4317
+      //   HTTP → http://grafana-alloy.monitoring.svc.cluster.local:4318
+      //
+      // Signal flow:
+      //   Receiver → Batch → metrics: Prometheus exporter → remote_write
+      //                    → traces:  OTLP exporter       → Tempo
+      //                    → logs:    Loki exporter        → Loki
+      //
+      // FILTERING OTLP SIGNALS
+      // ─────────────────────────────────────────────────────────────
+      // Traces — to probabilistically sample (e.g. keep 10%):
+      //   1. Add otelcol.processor.probabilistic_sampler "default" { ... }
+      //   2. Change otelcol.processor.batch.default output:
+      //        traces = [otelcol.processor.probabilistic_sampler.default.input]
+      //   3. Set the sampler's output:
+      //        traces = [otelcol.exporter.otlp.tempo.input]
+      //
+      // Traces — to drop health-check spans by URL attribute:
+      //   Use otelcol.processor.filter with:
+      //     error_mode = "ignore"
+      //     traces { span [ "attributes[\"http.target\"] == \"/health\"" ] }
+      //
+      // Logs — to forward only error-level OTLP logs to Loki:
+      //   Insert otelcol.processor.filter before otelcol.exporter.loki:
+      //     logs { log_record [ "severity_number < SEVERITY_NUMBER_ERROR" ] }
+      // ─────────────────────────────────────────────────────────────
+
+      // Receives metrics, traces, and logs from application services
+      otelcol.receiver.otlp "default" {
+        grpc {
+          endpoint = "0.0.0.0:4317"
+        }
+
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+
+        output {
+          metrics = [otelcol.processor.batch.default.input]
+          traces  = [otelcol.processor.batch.default.input]
+          logs    = [otelcol.processor.batch.default.input]
+        }
+      }
+
+      // Batches signals for efficient export
+      otelcol.processor.batch "default" {
+        output {
+          metrics = [otelcol.exporter.prometheus.default.input]
+          traces  = [otelcol.exporter.otlp.tempo.input]
+          logs    = [otelcol.exporter.loki.grafanacloud.input]
+        }
+      }
+
+      // Converts OTLP metrics to Prometheus format and forwards to remote_write
+      otelcol.exporter.prometheus "default" {
         forward_to = [prometheus.remote_write.grafanacloud.receiver]
       }
-      
-      // Discover Kubernetes services
+
+
+      // ============================================================
+      // SECTION 3: INFRASTRUCTURE METRICS — Kubernetes scraping
+      // ============================================================
+      // Pull model: Alloy discovers targets via Kubernetes API and
+      // scrapes their /metrics endpoints on a schedule.
+      //
+      // Each target follows the same two-component pattern:
+      //   discovery.relabel "<name>"  — filters & relabels targets
+      //   prometheus.scrape  "<name>" — scrapes and forwards metrics
+      //
+      // DROPPING METRICS (metric_relabel_rules)
+      // ──────────────────────────────────────
+      // Add inside any prometheus.scrape block to drop specific
+      // metric series before they are forwarded:
+      //
+      //   rule {
+      //     source_labels = ["__name__"]
+      //     regex         = "some_metric_name_to_drop"
+      //     action        = "drop"
+      //   }
+      //
+      // CHANGING SCRAPE INTERVAL
+      // ──────────────────────────────────────
+      // Adjust scrape_interval on each prometheus.scrape block.
+      // Current defaults: cAdvisor/ksm/node-exporter = 5m, Redis = 1m.
+      // ============================================================
+
+      // ── Alloy self-metrics ───────────────────────────────────────
+      prometheus.exporter.self "alloy" { }
+
+      prometheus.scrape "alloy" {
+        targets         = prometheus.exporter.self.alloy.targets
+        job_name        = "alloy"
+        scrape_interval = "1m"
+        forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+      }
+
+      // ── Kubernetes service discovery (shared across targets) ─────
       discovery.kubernetes "services" {
         role = "service"
       }
-      
-      // Discover Kubernetes pods
+
       discovery.kubernetes "pods" {
         role = "pod"
       }
-      
-      // Discover Kubernetes nodes for cAdvisor
+
       discovery.kubernetes "nodes" {
         role = "node"
       }
-      
-      // Scrape cAdvisor for container metrics
+
+      // ── cAdvisor — container CPU / memory / network / disk ───────
+      // Scraped directly from kubelet on each node.
       prometheus.scrape "cadvisor" {
         targets = discovery.kubernetes.nodes.targets
-        
+
         job_name        = "cadvisor"
         scheme          = "https"
         metrics_path    = "/metrics/cadvisor"
         scrape_interval = "5m"
-        
+
         bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-        
+
         tls_config {
           ca_file              = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
           insecure_skip_verify = false
         }
-        
+
         forward_to = [prometheus.remote_write.grafanacloud.receiver]
       }
-      
-      // Scrape kube-state-metrics
+
+      // ── kube-state-metrics — Kubernetes object state ─────────────
+      // Exposes counts, conditions, labels for pods, deployments, etc.
       discovery.relabel "kube_state_metrics" {
         targets = discovery.kubernetes.services.targets
-        
+
         rule {
           source_labels = ["__meta_kubernetes_service_name"]
-          regex = "kube-state-metrics"
-          action = "keep"
+          regex         = "kube-state-metrics"
+          action        = "keep"
         }
       }
-      
+
       prometheus.scrape "kube_state_metrics" {
         targets         = discovery.relabel.kube_state_metrics.output
         job_name        = "kube-state-metrics"
         scrape_interval = "5m"
         forward_to      = [prometheus.remote_write.grafanacloud.receiver]
       }
-      
-      // Scrape node-exporter
+
+      // ── node-exporter — host CPU / memory / disk / network ───────
+      // Runs as a DaemonSet; one pod per node.
       discovery.relabel "node_exporter" {
         targets = discovery.kubernetes.pods.targets
-        
+
         rule {
           source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
-          regex = "prometheus-node-exporter"
-          action = "keep"
+          regex         = "prometheus-node-exporter"
+          action        = "keep"
         }
       }
-      
+
       prometheus.scrape "node_exporter" {
         targets         = discovery.relabel.node_exporter.output
         job_name        = "node-exporter"
         scrape_interval = "5m"
         forward_to      = [prometheus.remote_write.grafanacloud.receiver]
       }
-      
-      // Scrape nginx-ingress-controller
+
+      // ── nginx-ingress — request rates, latency, error codes ──────
+      // Scrapes the controller pod's metrics port (:10254).
       discovery.relabel "nginx_ingress" {
         targets = discovery.kubernetes.pods.targets
-        
+
         rule {
           source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component"]
-          regex = "controller"
-          action = "keep"
+          regex         = "controller"
+          action        = "keep"
         }
-        
+
         rule {
           source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
-          regex = "ingress-nginx"
-          action = "keep"
+          regex         = "ingress-nginx"
+          action        = "keep"
         }
-        
+
+        // Override port to nginx-ingress metrics port
         rule {
-          replacement = "$1:10254"
-          target_label = "__address__"
-          regex = "([^:]+)(?::\\d+)?"
           source_labels = ["__address__"]
+          regex         = "([^:]+)(?::\\d+)?"
+          replacement   = "$1:10254"
+          target_label  = "__address__"
         }
       }
-      
+
       prometheus.scrape "nginx_ingress" {
         targets         = discovery.relabel.nginx_ingress.output
         job_name        = "nginx-ingress"
@@ -188,10 +288,10 @@ alloy:
         forward_to      = [prometheus.remote_write.grafanacloud.receiver]
       }
 
-      // ── Redis metrics (redis-exporter sidecar on port 9121) ─────────────────
-      // Bitnami chart deploys a redis-exporter container when metrics.enabled=true.
-      // We discover Redis pods by namespace + app label and override the port to 9121.
-
+      // ── Redis — redis-exporter sidecar on port 9121 ───────────────
+      // Bitnami chart deploys a redis-exporter container when
+      // metrics.enabled=true. We discover pods by namespace + app label
+      // and override the scrape port to 9121.
       discovery.relabel "redis" {
         targets = discovery.kubernetes.pods.targets
 
@@ -233,38 +333,65 @@ alloy:
         scrape_interval = "1m"
         forward_to      = [prometheus.remote_write.grafanacloud.receiver]
       }
-      // ── End Redis metrics ─────────────────────────────────────────────────────
 
-      // ── Pod log tailing (overflow-webapp only) ──────────────────────────────
-      // Only tails overflow-webapp pods. All .NET backend services already ship
-      // logs via OTLP → collecting them here too would cause duplicates in Loki
-      // and pollute labels (their plain-text "info: ..." format doesn't carry a
-      // parseable level field).
 
+      // ============================================================
+      // SECTION 4: POD LOG TAILING — stdout log collection
+      // ============================================================
+      // Tails stdout/stderr from selected pods via the Kubernetes API
+      // (no hostPath mount required).
+      //
+      // IMPORTANT: Only overflow-webapp is tailed here.
+      // .NET backend services ship logs via OTLP (Section 2).
+      // Tailing them would create duplicate log entries in Loki.
+      //
+      // TO ADD ANOTHER APP
+      // ──────────────────
+      // Extend the regex in the pod_logs relabel rule below:
+      //   regex = "overflow-webapp|my-other-app"
+      //
+      // TO FILTER LOG LEVELS
+      // ──────────────────
+      // Adjust the stage.regex expressions in loki.process "pod_logs".
+      // Current logic:
+      //   - Every line starts as level=info
+      //   - Lines matching \bwarn\b  → level=warn
+      //   - Lines matching \b(error|failed|exception)\b → level=error
+      //
+      // To suppress info logs entirely, add after the label stages:
+      //   stage.match {
+      //     selector = "{level=\"info\"}"
+      //     action   = "drop"
+      //   }
+      // ============================================================
+
+      // Filters to the pods we want to tail
       discovery.relabel "pod_logs" {
         targets = discovery.kubernetes.pods.targets
 
-        // Only tail pods in our app namespaces
+        // Only tail pods in application namespaces
         rule {
           source_labels = ["__meta_kubernetes_namespace"]
           regex         = "apps-staging|apps-production"
           action        = "keep"
         }
 
-        // Only collect overflow-webapp — .NET services ship logs via OTLP already
+        // Allowlist: add more apps here with | separator
+        // e.g. regex = "overflow-webapp|another-app"
         rule {
           source_labels = ["__meta_kubernetes_pod_label_app"]
           regex         = "overflow-webapp"
           action        = "keep"
         }
 
-        // Skip pods that are not running
+        // Skip pods that are not actively running
         rule {
           source_labels = ["__meta_kubernetes_pod_phase"]
           regex         = "Pending|Succeeded|Failed|Unknown"
           action        = "drop"
         }
 
+        // Attach metadata labels for Loki stream selection
         rule {
           source_labels = ["__meta_kubernetes_pod_name"]
           target_label  = "pod"
@@ -286,26 +413,23 @@ alloy:
         }
       }
 
-      // loki.source.kubernetes reads via the K8s API (no hostPath mount needed).
-      // NOTE: stage.cri {} must NOT be used here — the K8s API already strips the
-      // CRI prefix so stage.cri would drop every line.
+      // NOTE: stage.cri {} must NOT be used here — the Kubernetes API
+      // already strips the CRI prefix; using stage.cri would drop every line.
       loki.source.kubernetes "pod_logs" {
         targets    = discovery.relabel.pod_logs.output
         forward_to = [loki.process.pod_logs.receiver]
       }
 
+      // Extracts a log level label from stdout line content
       loki.process "pod_logs" {
-        // Default every line to level=info.
-        // loki.source.kubernetes has no stream label so we cannot derive it from there.
+        // Default every line to level=info
         stage.static_labels {
           values = {
             level = "info",
           }
         }
 
-        // Overwrite to "warn" for lines containing warn keywords.
-        // stage.labels only overwrites when the capture is non-empty —
-        // non-matching lines keep their current label value.
+        // Promote to level=warn when line contains a warn keyword
         stage.regex {
           expression = "(?i)\\b(?P<level>warn)\\b"
         }
@@ -313,7 +437,7 @@ alloy:
           values = { level = "" }
         }
 
-        // Overwrite to "error" for lines containing error/failed/exception.
+        // Promote to level=error for error/failed/exception keywords
         stage.regex {
           expression = "(?i)\\b(?P<level>error|failed|exception)\\b"
         }
@@ -323,8 +447,9 @@ alloy:
 
         forward_to = [loki.write.grafanacloud.receiver]
       }
-      // ── End pod log tailing ──────────────────────────────────────────────────
 
+  # ── Extra ports exposed by the Alloy Service ──────────────────────
+  # Required for applications to push OTLP telemetry to Alloy.
   extraPorts:
     - name: "otlp-grpc"
       port: 4317
@@ -371,4 +496,3 @@ rbac:
 serviceAccount:
   create: true
   name: grafana-alloy
-
