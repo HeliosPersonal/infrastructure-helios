@@ -1,6 +1,6 @@
 # ==============================================================================
 # GRAFANA ALLOY HELM VALUES
-# Managed by Terraform — variables (${var}) are interpolated at apply time.
+# Managed by Terraform — variables ($${var}) are interpolated at apply time.
 #
 # CONFIGURATION OVERVIEW
 # ──────────────────────
