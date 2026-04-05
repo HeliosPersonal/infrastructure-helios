@@ -42,21 +42,30 @@ variable "keycloak_subdomain" {
   description = "Subdomain for Keycloak (e.g., keycloak -> keycloak.devoverflow.org)"
 }
 
-variable "ddns_subdomains" {
-  type        = list(string)
-  default     = ["www", "staging", "keycloak", "k8s"]
-  description = "List of subdomains to configure DDNS for"
-}
-
 # ====================================================================================
 # CLOUDFLARE CONFIGURATION
 # ====================================================================================
 
-variable "cloudflare_api_token" {
+
+variable "cloudflared_enabled" {
+  type        = bool
+  default     = true
+  description = "Deploy cloudflared tunnel daemon (replaces router port forwarding)"
+}
+
+variable "cloudflare_tunnel_token" {
   type        = string
   sensitive   = true
-  description = "Cloudflare API token for DDNS updates"
+  default     = ""
+  description = "Cloudflare Tunnel token (from Zero Trust dashboard → Networks → Tunnels → Create tunnel → Docker). Embedded tunnel ID + credentials — no cert file needed."
 }
+
+variable "cloudflared_image_tag" {
+  type        = string
+  default     = "2025.4.0"
+  description = "cloudflared Docker image tag (pin to a specific release for reproducibility)"
+}
+
 
 # ====================================================================================
 # POSTGRESQL CONFIGURATION

@@ -33,6 +33,19 @@ resource "helm_release" "ingress_nginx" {
   version          = "4.15.1"
   create_namespace = false
 
+  # Cloudflare Tunnel sends X-Forwarded-Proto: https — trust it so nginx
+  # does NOT issue a 301 redirect when cloudflared connects on port 80.
+  set {
+    name  = "controller.config.use-forwarded-headers"
+    value = "true"
+  }
+
+  # Forward real client IP via CF-Connecting-IP / X-Real-IP
+  set {
+    name  = "controller.config.forwarded-for-header"
+    value = "CF-Connecting-IP"
+  }
+
   set {
     name  = "controller.config.ssl-redirect"
     value = "true"

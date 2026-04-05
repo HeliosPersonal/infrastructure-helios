@@ -42,7 +42,7 @@ Encode with: `base64 -w 0 terraform/certs/origin.crt`
 
 | Secret | Description |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token for DDNS updates |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token for cloudflared deployment (Zero Trust → Networks → Tunnels → your tunnel → token) |
 
 ### Domain Configuration
 

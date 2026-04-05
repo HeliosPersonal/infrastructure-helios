@@ -13,7 +13,6 @@
 base_domain        = "example.com"
 internal_domain    = "helios"
 keycloak_subdomain = "keycloak"
-ddns_subdomains    = ["www", "staging", "keycloak", "k8s"]
 
 # PostgreSQL (shared instance)
 pg_storage_size  = "100Gi"
@@ -57,8 +56,12 @@ headlamp_oidc_scopes    = "openid,profile,email,groups"
 # terraform.secret.tfvars (DO NOT commit to git!)
 # ====================================================================================
 
-# Cloudflare
-# cloudflare_api_token = "your-cloudflare-api-token"
+
+# Cloudflare Tunnel
+# (see docs/CLOUDFLARE_TUNNEL.md for setup instructions)
+# cloudflare_tunnel_token = "eyJhIjoiABC..."   # from Zero Trust dashboard
+# cloudflared_enabled     = true
+# cloudflared_image_tag   = "2025.4.0"
 
 # Shared Infrastructure Passwords
 # pg_password       = "your-postgres-password"

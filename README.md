@@ -63,15 +63,10 @@ Internet → Cloudflare (DNS/WAF/SSL) → Home Router → K3s Cluster
 
 ### 2. Cloudflare Setup
 
-1. Add your domain to Cloudflare
-2. Create API token: **My Profile → API Tokens → Create Token** (use "Edit zone DNS" template)
-3. Create DNS A records (any IP, DDNS will update):
-   - `@` (root)
-   - `www`
-   - `staging`
-   - `keycloak`
-4. Set SSL/TLS mode to **"Flexible"** or **"Full"** (Cloudflare Universal SSL handles certificates)
-5. Enable **"Always Use HTTPS"** under SSL/TLS → Edge Certificates
+1. Add your domain to Cloudflare and ensure it is the authoritative DNS
+2. Create a Cloudflare Tunnel (see [docs/CLOUDFLARE_TUNNEL.md](docs/CLOUDFLARE_TUNNEL.md))
+3. Set SSL/TLS mode to **"Full (strict)"** under SSL/TLS settings
+4. Enable **"Always Use HTTPS"** under SSL/TLS → Edge Certificates
 
 ### 3. Configure Terraform
 
@@ -303,7 +298,6 @@ Edit `terraform/terraform.tfvars`:
 ```hcl
 base_domain        = "your-domain.com"
 keycloak_subdomain = "auth"
-ddns_subdomains    = ["www", "staging", "auth"]
 ```
 
 ### Disable Components
