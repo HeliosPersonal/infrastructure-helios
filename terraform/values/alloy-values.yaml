@@ -24,8 +24,8 @@
 #                                block in Section 3
 # Tail logs from a new app     → extend the regex in discovery.relabel
 #                                "pod_logs" in Section 4
-# Change log-level detection   → edit stage.regex blocks in loki.process
-#                                "pod_logs" in Section 4
+# Change log-level detection   → edit stage.json / stage.labels blocks in
+#                                loki.process "pod_logs" in Section 4
 # ==============================================================================
 
 alloy:
@@ -352,17 +352,21 @@ alloy:
       //
       // TO FILTER LOG LEVELS
       // ──────────────────
-      // Adjust the stage.regex expressions in loki.process "pod_logs".
-      // Current logic:
-      //   - Every line starts as level=info
-      //   - Lines matching \bwarn\b  → level=warn
-      //   - Lines matching \b(error|failed|exception)\b → level=error
+      // pino's "level" field is extracted by stage.json and promoted to a
+      // Loki stream label by stage.labels (see loki.process "pod_logs").
+      // Possible values: trace / debug / info / warn / error / fatal
       //
-      // To suppress info logs entirely, add after the label stages:
+      // To suppress info logs entirely, add after the stage.labels block:
       //   stage.match {
       //     selector = "{level=\"info\"}"
       //     action   = "drop"
       //   }
+      //
+      // TO QUERY BY MODULE
+      // ──────────────────
+      // The "module" field (set via createLogger("auth") in the webapp) is
+      // also promoted to a Loki stream label. Query example:
+      //   {app="overflow-webapp", module="auth"} | json
       // ============================================================
 
       // Filters to the pods we want to tail
@@ -411,6 +415,11 @@ alloy:
           source_labels = ["__meta_kubernetes_pod_node_name"]
           target_label  = "node"
         }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
       }
 
       // NOTE: stage.cri {} must NOT be used here — the Kubernetes API
@@ -420,29 +429,43 @@ alloy:
         forward_to = [loki.process.pod_logs.receiver]
       }
 
-      // Extracts a log level label from stdout line content
+      // Parses pino's structured JSON logs and extracts labels.
+      //
+      // pino always emits one JSON object per line in production:
+      //   {"level":"info","time":"...","module":"auth","msg":"..."}
+      //
+      // stage.json gracefully skips non-JSON lines (e.g. Next.js startup
+      // banner "▲ Next.js 16.x") without dropping them.
+      //
+      // Loki labels added:
+      //   level     — pino level string (info / warn / error / debug / fatal)
+      //   module    — logger module name set via createLogger("auth") etc.
+      //
+      // To query by module in Grafana:
+      //   {app="overflow-webapp", module="auth"} | json
       loki.process "pod_logs" {
-        // Default every line to level=info
-        stage.static_labels {
-          values = {
-            level = "info",
+        // Extract fields from pino JSON
+        stage.json {
+          expressions = {
+            level  = "level",
+            module = "module",
+            time   = "time",
           }
         }
 
-        // Promote to level=warn when line contains a warn keyword
-        stage.regex {
-          expression = "(?i)\\b(?P<level>warn)\\b"
-        }
+        // Promote extracted fields to Loki stream labels
         stage.labels {
-          values = { level = "" }
+          values = {
+            level  = "",
+            module = "",
+          }
         }
 
-        // Promote to level=error for error/failed/exception keywords
-        stage.regex {
-          expression = "(?i)\\b(?P<level>error|failed|exception)\\b"
-        }
-        stage.labels {
-          values = { level = "" }
+        // Use pino's ISO timestamp as the authoritative log time
+        // so Loki doesn't use the collection time as the event time.
+        stage.timestamp {
+          source = "time"
+          format = "RFC3339Nano"
         }
 
         forward_to = [loki.write.grafanacloud.receiver]
@@ -471,6 +494,20 @@ alloy:
 controller:
   type: "deployment"
   replicas: 1
+
+  # ── inotify headroom fix ─────────────────────────────────────────────
+  # loki.source.kubernetes opens one inotify watch per pod log stream
+  # for position WAL files. k3s ships with fs.inotify.max_user_instances=128
+  # which is exhausted during rolling deployments (many pods × many streams).
+  # A privileged init container bumps the limit on the host before Alloy
+  # starts so watches are never refused.
+  # 1024 is generous for a single-node cluster; raise further if needed.
+  initContainers:
+    - name: inotify-tune
+      image: busybox:1.36
+      securityContext:
+        privileged: true
+      command: ["sysctl", "-w", "fs.inotify.max_user_instances=1024"]
 
 service:
   type: ClusterIP
