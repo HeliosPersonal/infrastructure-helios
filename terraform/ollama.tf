@@ -32,6 +32,12 @@ resource "kubernetes_persistent_volume_claim" "ollama" {
     }
   }
 
+  # local-path does not support volume expansion — ignore size changes on
+  # existing PVCs. Update ollama_storage_size only when creating from scratch.
+  lifecycle {
+    ignore_changes = [spec[0].resources[0].requests]
+  }
+
   depends_on = [kubernetes_namespace.infra_production]
 }
 
@@ -68,10 +74,12 @@ resource "local_file" "ollama_values" {
       existingClaim: "ollama"
 
     ollama:
-      # Pull model on container startup (persisted, so only downloads once)
+      # Pull models on container startup (persisted, so only downloads once)
       models:
         pull:
-          - ${var.ollama_default_model}
+    %{ for model in var.ollama_models ~}
+          - ${model}
+    %{ endfor ~}
 
     # Environment variables
     extraEnv:

@@ -14,15 +14,15 @@ service:
 
 resources:
   requests:
-    memory: 2Gi
+    memory: 4Gi
     cpu: 500m
   limits:
-    memory: 8Gi
+    memory: 24Gi
     cpu: 4000m
 
 persistence:
   enabled: true
-  size: 20Gi
+  size: 40Gi
   storageClass: ""  # Use default storage class
   accessMode: ReadWriteOnce
 

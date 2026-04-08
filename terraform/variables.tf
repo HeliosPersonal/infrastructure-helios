@@ -231,31 +231,31 @@ variable "ollama_helm_chart_version" {
 variable "ollama_image_tag" {
   type        = string
   description = "Ollama Docker image tag"
-  default     = "0.19.0"
+  default     = "0.20.3"
 }
 
-variable "ollama_default_model" {
-  type        = string
-  description = "Default LLM model to download on initialization"
-  default     = "qwen2.5:7b"
+variable "ollama_models" {
+  type        = list(string)
+  description = "LLM models to pull on initialization"
+  default     = ["qwen2.5:7b"]
 }
 
 variable "ollama_storage_size" {
   type        = string
   description = "Persistent volume size for model storage"
-  default     = "20Gi"
+  default     = "40Gi"
 }
 
 variable "ollama_memory_request" {
   type        = string
   description = "Memory request for Ollama pod"
-  default     = "2Gi"
+  default     = "4Gi"
 }
 
 variable "ollama_memory_limit" {
   type        = string
   description = "Memory limit for Ollama pod"
-  default     = "12Gi"
+  default     = "24Gi"
 }
 
 variable "ollama_cpu_request" {
