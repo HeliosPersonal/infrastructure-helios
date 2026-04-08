@@ -255,7 +255,7 @@ variable "ollama_memory_request" {
 variable "ollama_memory_limit" {
   type        = string
   description = "Memory limit for Ollama pod"
-  default     = "24Gi"
+  default     = "40Gi"
 }
 
 variable "ollama_cpu_request" {
