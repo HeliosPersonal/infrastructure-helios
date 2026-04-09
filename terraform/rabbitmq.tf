@@ -34,9 +34,15 @@ resource "helm_release" "rabbitmq" {
   }
 
   # Enable shovel plugin for moving/forwarding messages between brokers or queues
+  # Chart uses "additionalPlugins" (list), not "extraPlugins"
   set {
-    name  = "extraPlugins"
-    value = "rabbitmq_shovel rabbitmq_shovel_management"
+    name  = "additionalPlugins[0]"
+    value = "rabbitmq_shovel"
+  }
+
+  set {
+    name  = "additionalPlugins[1]"
+    value = "rabbitmq_shovel_management"
   }
 
   # Resource limits
