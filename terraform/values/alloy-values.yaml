@@ -136,7 +136,30 @@ alloy:
         output {
           metrics = [otelcol.exporter.prometheus.default.input]
           traces  = [otelcol.exporter.otlp.tempo.input]
-          logs    = [otelcol.exporter.loki.grafanacloud.input]
+          logs    = [otelcol.processor.filter.drop_health_logs.input]
+        }
+      }
+
+      // Drops noisy health-check log records before they reach Loki.
+      // All .NET services emit Information-level HttpClient/Polly logs for
+      // every /ready, /alive, /health probe — these are high-frequency and
+      // carry no actionable signal. The filter matches on the RequestPath
+      // attribute that ASP.NET Core attaches to every request-scoped log.
+      // error_mode = "ignore" ensures any record that can't be evaluated
+      // (e.g. missing attribute) is passed through rather than dropped.
+      otelcol.processor.filter "drop_health_logs" {
+        error_mode = "ignore"
+
+        logs {
+          log_record = [
+            "attributes[\"RequestPath\"] == \"/ready\"",
+            "attributes[\"RequestPath\"] == \"/alive\"",
+            "attributes[\"RequestPath\"] == \"/health\"",
+          ]
+        }
+
+        output {
+          logs = [otelcol.exporter.loki.grafanacloud.input]
         }
       }
 
