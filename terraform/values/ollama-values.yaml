@@ -1,56 +1,57 @@
 # Ollama Helm Chart Values
-# Managed by Terraform
+# Managed by Terraform — chart v1.54.0+
 
 image:
   repository: ollama/ollama
-  tag: latest
+  tag: 0.40.6
   pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
   port: 11434
-  targetPort: 11434
-  name: ollama-svc
 
 resources:
   requests:
     memory: 4Gi
     cpu: 500m
   limits:
-    memory: 24Gi
+    memory: 40Gi
     cpu: 4000m
 
-persistence:
+# Persistent storage so models survive pod restarts
+# Uses the existing PVC created by the previous chart version.
+# This avoids the "spec is immutable" error on upgrade.
+persistentVolume:
   enabled: true
-  size: 40Gi
-  storageClass: ""  # Use default storage class
-  accessMode: ReadWriteOnce
+  existingClaim: "ollama"
+
+ollama:
+  # Pull models on container startup (persisted, so only downloads once)
+  models:
+    pull:
+          - qwen3.5:4b
 
 # Environment variables
-env:
+extraEnv:
   - name: OLLAMA_HOST
     value: "0.0.0.0:11434"
-
-# Init container to pull model
-initModels:
-  enabled: true
-  models:
-    - qwen2.5:7b
+  - name: OLLAMA_DEBUG
+    value: "0"
+  - name: GIN_MODE
+    value: "release"
 
 livenessProbe:
   enabled: true
-  httpGet:
-    path: /
-    port: 11434
-  initialDelaySeconds: 30
+  path: /
+  initialDelaySeconds: 60
   periodSeconds: 10
   timeoutSeconds: 5
+  failureThreshold: 6
 
 readinessProbe:
   enabled: true
-  httpGet:
-    path: /
-    port: 11434
-  initialDelaySeconds: 10
+  path: /
+  initialDelaySeconds: 30
   periodSeconds: 5
   timeoutSeconds: 3
+  failureThreshold: 6
