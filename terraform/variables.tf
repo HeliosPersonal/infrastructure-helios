@@ -231,13 +231,22 @@ variable "ollama_helm_chart_version" {
 variable "ollama_image_tag" {
   type        = string
   description = "Ollama Docker image tag"
-  default     = "0.20.3"
+  # Must stay recent enough for the qwen35 architecture in ollama_models below.
+  # Verified: the previous 0.20.3 pin rejects `ollama pull qwen3.5:4b` outright with
+  # HTTP 412 "requires a newer version of Ollama"; 0.32.5 pulls and serves it fine.
+  # The exact floor is somewhere between the two — do not drop below 0.32.5.
+  default = "0.40.6"
 }
 
 variable "ollama_models" {
   type        = list(string)
   description = "LLM models to pull on initialization"
-  default     = ["qwen2.5:7b"]
+  # qwen3.5:4b — sparse-MoE, ~3.5Gi on disk, 256K context. Only a fraction of the
+  # weights is active per token, so it generates noticeably faster than the previous
+  # qwen2.5:7b on this CPU-only node while scoring higher on instruction-following
+  # (IFEval 89.8) and JSON extraction — what the Overflow DataSeeder actually needs.
+  # Keep in sync with AiAnswerOptions:LlmModel in Overflow.DataSeederService.
+  default = ["qwen3.5:4b"]
 }
 
 variable "ollama_storage_size" {

@@ -35,8 +35,8 @@ keycloak_admin_user = "admin"
 # Ollama
 ollama_enabled            = true
 ollama_helm_chart_version = "1.54.0"
-ollama_image_tag          = "0.20.3"
-ollama_models             = ["qwen2.5:7b"]
+ollama_image_tag          = "0.40.6"
+ollama_models             = ["qwen3.5:4b"]
 ollama_storage_size       = "40Gi"
 ollama_memory_request     = "4Gi"
 ollama_memory_limit       = "24Gi"
