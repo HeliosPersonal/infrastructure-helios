@@ -61,7 +61,7 @@ headlamp_oidc_scopes    = "openid,profile,email,groups"
 # (see docs/CLOUDFLARE_TUNNEL.md for setup instructions)
 # cloudflare_tunnel_token = "eyJhIjoiABC..."   # from Zero Trust dashboard
 # cloudflared_enabled     = true
-# cloudflared_image_tag   = "2025.4.0"
+# cloudflared_image_tag   = "2026.10.3"
 
 # Shared Infrastructure Passwords
 # pg_password       = "your-postgres-password"
