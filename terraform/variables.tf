@@ -62,7 +62,7 @@ variable "cloudflare_tunnel_token" {
 
 variable "cloudflared_image_tag" {
   type        = string
-  default     = "2025.4.0"
+  default     = "2026.10.3"
   description = "cloudflared Docker image tag (pin to a specific release for reproducibility)"
 }
 
